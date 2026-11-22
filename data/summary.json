@@ -1,0 +1,59 @@
+{
+ "loader_addresses_total": 185,
+ "matchable": 183,
+ "found": 136,
+ "found_pct": 74.3,
+ "of_which_derived_guesses": 11,
+ "functions": 131,
+ "function_bodies": {
+  "identical": 54,
+  "rewritten": 31,
+  "same-shape": 16,
+  "not found": 24,
+  "similar": 6
+ },
+ "by_group": {
+  "files, memory and system": {
+   "located": 24,
+   "unresolved": 3
+  },
+  "graphics library": {
+   "located": 53,
+   "unresolved": 15,
+   "conflict": 1
+  },
+  "screens and widgets": {
+   "located": 26,
+   "unresolved": 5,
+   "derived": 5
+  },
+  "vibration tweak (optional extra)": {
+   "unresolved": 17,
+   "located": 4,
+   "own-placement": 2
+  },
+  "watch services": {
+   "unresolved": 6,
+   "located": 18,
+   "derived": 6
+  }
+ },
+ "wp2_functions": 8869,
+ "wp2_functions_by_class": {
+  "no counterpart found": 3877,
+  "identical": 4334,
+  "rewritten": 200,
+  "similar": 129,
+  "same-shape": 329
+ },
+ "wp2_code_bytes_pct": {
+  "same": 33.5,
+  "changed": 13.1,
+  "none": 53.4
+ },
+ "self_check": {
+  "agree": 2124,
+  "disagree": 8,
+  "b_claimed_twice": 0
+ }
+}

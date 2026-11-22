@@ -1,0 +1,9 @@
+layer,wp2_ranges,functions,code_kb,share_of_code_pct,same_pct,changed_pct,none_pct,contents
+Watch app (application/bt_watch),0x100586a4-0x100edfec,1575,371.6,29.3,4.7,8.2,87.0,"screens, JX widgets, watch-face manager, ux2sys settings"
+Display and UI service (framework/display),0x101822c0-0x10199144,383,74.0,5.8,23.7,20.0,56.3,"view stack/cache/manager, input, surfaces, ui_mem"
+Graphics library (thirdparty/lib/gui/lvgl),0x101255e0-0x10145d84,447,115.0,9.1,26.9,43.6,29.5,LVGL core/draw/widgets/extra + Actions GPU and VGLite porting
+"System services (framework/base, system, audio, ota)",0x10145d84-0x1015e4a4,479,69.4,5.5,47.6,28.3,24.1,"app/service manager, streams, logging, audio, OTA"
+Bluetooth stack (framework/bluetooth),0x1015e4a4-0x101822c0,675,84.9,6.7,74.4,14.9,10.7,bt_manager + bt_stack (BR/EDR and LE)
+Zephyr OS and drivers (zephyr/...),0x100edfec-0x101255e0 0x10199144-0x1019c400,1066,156.2,12.3,54.8,14.1,31.1,"lib/os, soc, subsys, drivers, HAL, arch, kernel"
+C and maths libraries (newlib and others),0x10040000-0x100586a4 0x101a8000-0x101b0000 0x101b8000-0x10300000,3087,244.3,19.3,69.9,5.9,24.2,newlib and unnamed library code
+Unlabelled code,0x10000000-0x10040000 0x1019c400-0x101a8000 0x101b0000-0x101b8000,1157,151.6,12.0,4.1,0.9,95.0,no path strings; almost none matched

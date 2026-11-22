@@ -1,0 +1,186 @@
+name,group,kind,wp2_addr,wp3_addr,status,how,address_confidence,body,similarity,votes,review_note,sdk_file,sdk_line
+APP_VBASE,"files, memory and system",data,0x10000000,0x10000000,located,data-ref,high,,,3,address found; contents not compared,src/wp2apps/firmware.py,15
+VIEW_TABLE,screens and widgets,data,0x100004b8,0x1000050c,located,data-ref,high,,,5,address found; contents not compared,fw/wp2-core/src/stock.rs,28
+VIEW_TABLE_END,screens and widgets,data,0x100013e8,0x1000136c,located,data-ref,high,,,3,address found; contents not compared,fw/wp2-core/src/stock.rs,29
+SIMPLE_IMG_CREATE,screens and widgets,function,0x1005a015,0x10041959,located,callgraph,high,identical,1.00,3,,fw/wp2-core/src/stock.rs,232
+SIMPLE_IMG_SET_SRC,screens and widgets,function,0x1005a02d,0x101c675d,located,callgraph,high,rewritten,0.26,6,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,233
+VIMG_SET_ZOOM,screens and widgets,function,0x1005a2d1,0x101c6801,located,callgraph,high,rewritten,0.00,4,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,25
+VLABEL_CREATE,screens and widgets,function,0x1005b579,0x10042a95,located,callgraph-loose,high,identical,1.00,10,,fw/wp2-stub/src/applist.rs,26
+VLABEL_SET_TEXT,screens and widgets,function,0x1005b70d,0x10042c29,located,callgraph-loose,high,same-shape,1.00,13,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,28
+RETURN_CLOCK,screens and widgets,function,0x1005d969,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,207
+STOCK_LAYOUT,screens and widgets,function,0x1005eee5,,unresolved,,,,,,,fw/wp2-stub/src/applist.rs,6
+SETLIST_SUBTITLE,vibration tweak (optional extra),data,0x100b54b2,,unresolved,,,,,,,src/wp2apps/firmware.py,69
+SETLIST_SUBTITLE_ADD,vibration tweak (optional extra),data,0x100b54b8,,unresolved,,,,,,,src/wp2apps/firmware.py,70
+STOCK_GET_LEVEL,vibration tweak (optional extra),function,0x100bb6b8,,unresolved,,,,,,,src/wp2apps/firmware.py,61
+STOCK_GET_LEVEL,vibration tweak (optional extra),function,0x100bb6f4,,unresolved,,,,,,,src/wp2apps/firmware.py,61
+STOCK_GET_LEVEL,vibration tweak (optional extra),function,0x100bb730,0x100ac1fc,located,callgraph,high,same-shape,1.00,4,"code differs: check behaviour, arguments and struct offsets",src/wp2apps/firmware.py,61
+CROWN_MAX,vibration tweak (optional extra),code-site,0x100bb892,0x100ac35e,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,54
+PREVIEW_CALLS,vibration tweak (optional extra),code-site,0x100bb8ae,0x100ac37a,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,62
+PREVIEW_CALLS,vibration tweak (optional extra),code-site,0x100bb938,0x100ac404,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,62
+GET_LEVEL_CALLS,vibration tweak (optional extra),code-site,0x100bb966,,unresolved,,,,,,,src/wp2apps/firmware.py,64
+GET_LEVEL_CALLS,vibration tweak (optional extra),code-site,0x100bba3e,,unresolved,,,,,,,src/wp2apps/firmware.py,64
+ROLLER_FORMAT_LITERALS,vibration tweak (optional extra),data,0x100bbadc,,unresolved,,,,,,,src/wp2apps/firmware.py,53
+ROLLER_FORMAT_LITERALS,vibration tweak (optional extra),data,0x100bbbd0,,unresolved,,,,,,,src/wp2apps/firmware.py,53
+SET_LEVEL_CALLS,vibration tweak (optional extra),data,0x100bbc00,,unresolved,,,,,,,src/wp2apps/firmware.py,63
+TIME_ZONE,watch services,function,0x100c1459,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,165
+RTC_GET_TIME,watch services,function,0x100c14b5,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,163
+WAKE_UNLOCK,watch services,function,0x100c1859,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,173
+STOCK_BLE_READ,watch services,function,0x100cc284,0x100c0eec,located,callgraph,medium,same-shape,1.00,2,"code differs: check behaviour, arguments and struct offsets",src/wp2apps/firmware.py,31
+READ_PAYLOAD,watch services,function,0x100cc285,0x100c0eed,located,callgraph,medium,same-shape,1.00,2,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/ble.rs,20
+SEND,watch services,function,0x100cc2d5,0x100c0f3d,located,callgraph,high,rewritten,0.21,8,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/ble.rs,23
+BLE_CALL,watch services,code-site,0x100d34f0,,unresolved,,,,,,,src/wp2apps/firmware.py,30
+JX_SCROLL_BAR_CREATE,screens and widgets,function,0x100d93cd,0x100d17ed,located,callgraph,high,identical,1.00,6,,fw/wp2-core/src/stock.rs,57
+JX_SCROLL_BAR_SET_SCROLL_OBJ,screens and widgets,function,0x100d93e5,0x100d1805,located,callgraph,high,rewritten,0.37,4,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,59
+JX_SCROLL_BAR_SET_KNOB,screens and widgets,function,0x100d94ed,0x101d2139,located,callgraph,high,rewritten,0.00,4,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,61
+FONT_OPEN_STOCK,graphics library,function,0x100df9a1,0x100d9151,located,callgraph,high,same-shape,1.00,15,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,228
+SCENE_LANG,screens and widgets,function,0x100dfb89,0x100d93ad,located,signature,high,identical,1.00,14,,fw/wp2-core/src/stock.rs,219
+CARDS_SAVE,screens and widgets,function,0x100e05ed,0x100d9fc9,located,signature,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,147
+UX2SYS_SET,watch services,function,0x100e07b9,0x100da1a1,located,callgraph,high,similar,0.89,5,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,180
+UX2SYS_GET,watch services,function,0x100e082d,0x100da21d,located,callgraph,high,same-shape,1.00,34,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,184
+UX2SYS_SET_LEN,watch services,function,0x100e08b9,0x100da2a9,located,callgraph,high,same-shape,1.00,13,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,239
+LEVELS_BOUNDS,vibration tweak (optional extra),data,0x100e17ce,,unresolved,,,,,,,src/wp2apps/firmware.py,51
+LEVELS_LITERALS,vibration tweak (optional extra),data,0x100e17f0,,unresolved,,,,,,,src/wp2apps/firmware.py,50
+LEVELS_BOUNDS,vibration tweak (optional extra),data,0x100e17fa,,unresolved,,,,,,,src/wp2apps/firmware.py,51
+LEVELS_LITERALS,vibration tweak (optional extra),data,0x100e1810,,unresolved,,,,,,,src/wp2apps/firmware.py,50
+MOTOR_CALL,vibration tweak (optional extra),code-site,0x100fb398,,unresolved,,,,,,,src/wp2apps/firmware.py,41
+STOCK_MOTOR,vibration tweak (optional extra),function,0x100fb4b4,,unresolved,,,,,,,src/wp2apps/firmware.py,42
+K_THREAD_ABORT,"files, memory and system",function,0x10105c91,0x10114b65,located,signature,high,identical,1.00,3,,fw/wp2-core/src/stock.rs,22
+FS_FIND_MOUNT,"files, memory and system",function,0x10106fa1,0x10115e89,located,signature,high,identical,1.00,13,,fw/wp2-core/src/stock.rs,8
+FS_OPEN,"files, memory and system",function,0x10107031,0x10115f19,located,signature,high,identical,1.00,25,,fw/wp2-core/src/stock.rs,9
+FS_CLOSE,"files, memory and system",function,0x101071e1,0x101160c9,located,signature,high,identical,1.00,31,,fw/wp2-core/src/stock.rs,10
+FS_READ,"files, memory and system",function,0x10107239,0x10116121,located,signature,high,identical,1.00,55,,fw/wp2-core/src/stock.rs,11
+FS_WRITE,"files, memory and system",function,0x10107295,0x1011617d,located,signature,high,identical,1.00,9,,fw/wp2-core/src/stock.rs,12
+FS_SEEK,"files, memory and system",function,0x101072f1,0x101161d9,located,signature,high,identical,1.00,49,,fw/wp2-core/src/stock.rs,13
+FS_TELL,"files, memory and system",function,0x10107351,0x10116239,located,signature,high,identical,1.00,6,,fw/wp2-core/src/stock.rs,14
+FS_SYNC,"files, memory and system",function,0x101073a5,0x101162d9,located,signature,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,15
+FS_UNLINK,"files, memory and system",function,0x1010764d,0x10116639,located,callgraph,high,same-shape,1.00,5,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,16
+FS_RENAME,"files, memory and system",function,0x10107705,0x101166f1,located,signature-partial,medium,same-shape,1.00,0,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,17
+KV_GET,watch services,function,0x1010e215,0x1011ec0d,located,signature,high,identical,1.00,8,,fw/wp2-core/src/stock.rs,176
+PWM_OFF,watch services,function,0x101214ad,0x10132415,located,signature,high,identical,1.00,0,,fw/wp2-core/src/stock.rs,139
+PWM_PIN_SET_CYCLES,watch services,function,0x1012197d,0x101328e5,located,signature,high,identical,1.00,0,,fw/wp2-core/src/stock.rs,138
+LV_DISP_GET_SCR_ACT,graphics library,function,0x101255e1,0x101366dd,located,signature,high,identical,1.00,16,,fw/wp2-core/src/stock.rs,31
+EVENT_SEND,graphics library,function,0x101259c5,0x10136a3d,located,callgraph,high,rewritten,0.42,129,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,21
+LV_OBJ_ADD_EVENT_CB,graphics library,function,0x10125a95,0x10136aa1,located,callgraph,high,rewritten,0.49,50,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,43
+LV_OBJ_CREATE,graphics library,function,0x10127cfd,0x10138b49,located,callgraph,high,identical,1.00,29,,fw/wp2-core/src/stock.rs,49
+LV_OBJ_CLEAR_FLAG,graphics library,function,0x10127e7d,0x101e428d,located,callgraph,high,rewritten,0.37,49,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,50
+LV_OBJ_ADD_STATE,graphics library,function,0x10128245,0x101e4311,located,callgraph,high,rewritten,0.00,5,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,116
+LV_OBJ_CLEAR_STATE,graphics library,function,0x10128311,0x101e4323,located,callgraph-loose,high,rewritten,0.00,7,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,117
+LV_OBJ_HAS_FLAG,graphics library,function,0x101283dd,0x101e4335,located,callgraph,high,rewritten,0.05,75,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,111
+LV_DISP_ADD_KNOB_OBJ,graphics library,function,0x10128c51,0x1013912d,located,callgraph-loose,medium,similar,0.86,2,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,52
+LV_OBJ_ADD_FLAG,graphics library,function,0x10128d39,0x101e4367,located,callgraph,high,rewritten,0.38,98,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,42
+OBJ_SET_X,graphics library,function,0x101290cd,0x101e4d55,located,callgraph,medium,rewritten,0.14,3,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,14
+LV_OBJ_SET_POS,graphics library,function,0x1012926d,0x101e4db1,located,callgraph,high,rewritten,0.05,8,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,34
+LV_OBJ_SET_SIZE,graphics library,function,0x101294c9,0x101e4e23,located,callgraph,high,rewritten,0.05,60,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,35
+OBJ_GET_Y,graphics library,function,0x101298b9,0x101e4ef9,located,callgraph,high,rewritten,0.20,10,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,10
+OBJ_GET_Y2,graphics library,function,0x10129b05,,unresolved,,,,,,,fw/wp2-stub/src/applist.rs,11
+LV_OBJ_INVALIDATE_AREA,graphics library,function,0x10129ef1,0x101e526d,located,callgraph,high,rewritten,0.04,13,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,38
+LV_OBJ_INVALIDATE,graphics library,function,0x10129fd9,0x101e52a9,located,callgraph,high,rewritten,0.12,40,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,36
+LV_OBJ_ALIGN_TO,graphics library,function,0x1012a87d,0x10139c45,located,callgraph,high,rewritten,0.02,67,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,234
+LV_OBJ_GET_SCROLL_BOTTOM,graphics library,function,0x1012ae09,0x1013a029,located,callgraph,high,rewritten,0.52,14,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,127
+LV_OBJ_SCROLL_TO_Y,graphics library,function,0x1012b381,0x101e573b,located,callgraph,high,rewritten,0.17,13,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,128
+OBJ_ADD_STYLE,graphics library,function,0x1012bb15,0x1013aa71,located,callgraph,high,similar,0.80,20,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,20
+LV_OBJ_GET_CHILD,graphics library,function,0x1012c3dd,0x101e66bb,located,callgraph,high,rewritten,0.00,61,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,114
+LV_OBJ_GET_CHILD_CNT,graphics library,function,0x1012c4ad,0x101e66d9,located,callgraph,high,rewritten,0.00,45,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,115
+LV_OBJ_DEL,graphics library,function,0x1012c775,0x101e6719,located,callgraph,high,rewritten,0.09,24,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,39
+LV_OBJ_SET_FLEX_FLOW,graphics library,function,0x10133545,0x101418ad,located,signature,high,identical,1.00,4,,fw/wp2-core/src/stock.rs,106
+LV_OBJ_SET_FLEX_ALIGN,graphics library,function,0x10133595,0x101418fd,located,signature,high,identical,1.00,0,,fw/wp2-core/src/stock.rs,108
+LV_TILEVIEW_CREATE,graphics library,function,0x101380a1,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,122
+LV_TILEVIEW_ADD_TILE,graphics library,function,0x101380b9,0x101460d1,located,signature,high,identical,1.00,0,,fw/wp2-core/src/stock.rs,123
+LV_OBJ_SET_TILE_ID,graphics library,function,0x101380e9,0x10146101,located,signature,high,identical,1.00,12,,fw/wp2-core/src/stock.rs,124
+LV_TIMER_CREATE,graphics library,function,0x1013b10d,0x10148e6d,located,signature,high,identical,1.00,6,,fw/wp2-core/src/stock.rs,40
+LV_TIMER_DEL,graphics library,function,0x1013b1a5,0x10148f05,located,signature,high,identical,1.00,13,,fw/wp2-core/src/stock.rs,41
+LV_ARC_CREATE,graphics library,function,0x1013ba55,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,86
+LV_ARC_SET_ROTATION,graphics library,function,0x1013c055,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,92
+LV_ARC_SET_VALUE,graphics library,function,0x1013c109,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,88
+LV_ARC_GET_VALUE,graphics library,function,0x1013c2ed,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,89
+LV_BAR_CREATE,graphics library,function,0x1013cea1,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,93
+LV_BAR_SET_VALUE,graphics library,function,0x1013ceb9,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,95
+LV_BAR_GET_VALUE,graphics library,function,0x1013d079,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,97
+LV_BAR_SET_RANGE,graphics library,function,0x1013d295,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,96
+LV_BTN_CREATE,graphics library,function,0x1013d389,0x1014a39d,located,callgraph,high,identical,1.00,15,,fw/wp2-core/src/stock.rs,85
+LV_IMG_CREATE,graphics library,function,0x1013ed39,0x1014b2dd,located,callgraph,high,identical,1.00,28,,fw/wp2-core/src/stock.rs,32
+LV_IMG_SET_SRC,graphics library,function,0x1013ed51,0x1014b2f5,located,callgraph,high,similar,0.76,30,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,33
+LV_LABEL_CREATE,graphics library,function,0x1013f5f1,0x1014bb49,located,callgraph,high,identical,1.00,32,,fw/wp2-core/src/stock.rs,62
+LV_LABEL_SET_TEXT,graphics library,function,0x101400a5,0x1014c3d1,located,callgraph,high,rewritten,0.52,25,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,64
+LV_LABEL_SET_LONG_MODE,graphics library,function,0x1014051d,0x1014c611,located,callgraph,high,rewritten,0.30,11,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,65
+LV_ROLLER_CREATE,graphics library,function,0x10140e01,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,99
+LV_ROLLER_SET_OPTIONS,graphics library,function,0x10140e19,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,101
+LV_ROLLER_SET_SELECTED,graphics library,function,0x10141045,0x101ed02b,located,callgraph,high,rewritten,0.00,5,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,103
+LV_ROLLER_GET_SELECTED,graphics library,function,0x10141691,0x101ed0b7,located,callgraph,high,rewritten,0.07,4,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,104
+LV_SLIDER_CREATE,graphics library,function,0x10141eb9,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,98
+STOCK_HEAP_INIT,"files, memory and system",function,0x10146aa4,0x10152f18,located,callgraph,medium,similar,0.76,2,"code differs: check behaviour, arguments and struct offsets",src/wp2apps/firmware.py,29
+stock_heap_init,"files, memory and system",function,0x10146aa5,0x10152f19,located,callgraph,medium,similar,0.76,2,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/link.ld,3
+SCENE_OPEN,screens and widgets,function,0x10184805,0x101982c9,located,signature,high,identical,1.00,16,,fw/wp2-core/src/stock.rs,212
+SCENE_IMGS,screens and widgets,function,0x101848d5,0x10198399,located,callgraph,high,identical,1.00,17,,fw/wp2-core/src/stock.rs,214
+SCENE_TEXTS,screens and widgets,function,0x10184a5d,0x10198521,located,callgraph,high,same-shape,1.00,30,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,216
+LVGL_BITMAP_FONT_OPEN,graphics library,function,0x10185c31,0x101996e9,located,signature,high,identical,1.00,3,,fw/wp2-core/src/stock.rs,67
+LVGL_BITMAP_FONT_CLOSE,graphics library,function,0x10185d3d,0x101997f5,located,signature,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,68
+UI_MEM_ALIGNED_ALLOC,"files, memory and system",function,0x101882c5,0x1019c389,located,callgraph,high,same-shape,1.00,5,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,2
+UI_MEM_FREE,"files, memory and system",function,0x10188381,0x1019c445,located,callgraph,high,same-shape,1.00,24,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,3
+BOOT_CALL,"files, memory and system",code-site,0x101884fa,0x1019c646,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,28
+HEAP_LITERALS,"files, memory and system",literal-slot,0x10188508,0x1019c654,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,9
+HEAP_LITERALS,"files, memory and system",code-site,0x10188588,,unresolved,,,,,,,src/wp2apps/firmware.py,9
+HEAP_LITERALS,"files, memory and system",data,0x101885f4,,unresolved,,,,,,,src/wp2apps/firmware.py,9
+VIEW_OPEN,screens and widgets,function,0x101898bd,0x1019deb1,located,callgraph,high,same-shape,1.00,7,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,25
+VIEW_START_LITERALS,screens and widgets,literal-slot,0x1018bc24,0x101a1304,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,22
+VIEW_END_LITERALS,screens and widgets,literal-slot,0x1018bc28,0x101a1308,located,aligned,high,,,,address found; contents not compared,src/wp2apps/firmware.py,23
+VIEW_START_LITERALS,screens and widgets,data,0x1018df3c,,unresolved,,,,,,,src/wp2apps/firmware.py,22
+VIEW_END_LITERALS,screens and widgets,data,0x1018df40,,unresolved,,,,,,,src/wp2apps/firmware.py,23
+SYS_CLOCK_TICK_GET,"files, memory and system",function,0x1019b7e1,0x101b2ee9,located,signature,high,identical,1.00,12,,fw/wp2-core/src/stock.rs,24
+VLABEL_SET_LONG_MODE,screens and widgets,function,0x101acba5,0x101c694d,located,callgraph-loose,high,same-shape,1.00,10,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/applist.rs,27
+WAKE_LOCK,watch services,function,0x101b59a9,0x101d0de1,located,signature,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,172
+ENCRYPT,watch services,function,0x101b605b,0x100c19d1,located,callgraph,high,rewritten,0.14,12,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/ble.rs,22
+DECRYPT,watch services,function,0x101b608d,0x100c1b65,located,callgraph,high,rewritten,0.14,4,"code differs: check behaviour, arguments and struct offsets",fw/wp2-stub/src/ble.rs,21
+OS_THREAD_CREATE,"files, memory and system",function,0x101be1a3,0x101dba09,located,signature,high,identical,1.00,8,,fw/wp2-core/src/stock.rs,19
+OS_SLEEP,"files, memory and system",function,0x101be1ed,0x101dba53,located,signature,high,identical,1.00,51,,fw/wp2-core/src/stock.rs,20
+PSRAM_CACHE_FLUSH_INVALIDATE,"files, memory and system",function,0x101bee53,0x101dc72f,located,signature,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,6
+LV_EVENT_GET_TARGET,graphics library,function,0x101c4c93,0x101e37bf,located,callgraph,high,identical,1.00,40,,fw/wp2-core/src/stock.rs,109
+LV_EVENT_GET_CODE,graphics library,function,0x101c4c9b,0x101e37c7,located,callgraph,high,identical,1.00,72,,fw/wp2-core/src/stock.rs,44
+LV_EVENT_GET_PARAM,graphics library,function,0x101c4ca3,0x101e37cf,located,callgraph,high,identical,1.00,33,,fw/wp2-core/src/stock.rs,45
+LV_EVENT_GET_USER_DATA,graphics library,function,0x101c4ca7,0x101e37d3,located,callgraph,high,identical,1.00,26,,fw/wp2-core/src/stock.rs,48
+LV_INDEV_GET_POINT,graphics library,function,0x101c4f57,0x101e3ae9,located,callgraph,medium,same-shape,1.00,2,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,47
+LV_INDEV_GET_GESTURE_DIR,graphics library,function,0x101c4f7d,0x101e3b0f,located,callgraph,high,identical,1.00,6,,fw/wp2-core/src/stock.rs,243
+LV_INDEV_WAIT_RELEASE,graphics library,function,0x101c4fd5,0x101e3b67,located,signature,high,identical,1.00,7,,fw/wp2-core/src/stock.rs,244
+LV_OBJ_ALIGN,graphics library,function,0x101c5de5,0x101e4e85,located,callgraph,high,same-shape,0.91,78,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,55
+LV_OBJ_GET_SCROLL_Y,graphics library,function,0x101c6515,0x101e55e7,located,signature,high,identical,1.00,20,,fw/wp2-core/src/stock.rs,126
+LV_OBJ_SET_LOCAL_STYLE_PROP,graphics library,function,0x101c6f9b,0x101e609d,located,signature,high,identical,1.00,88,,fw/wp2-core/src/stock.rs,54
+OBJ_SET_OPA,graphics library,function,0x101c74c5,0x101e664f,located,signature,high,identical,1.00,3,,fw/wp2-stub/src/applist.rs,15
+LV_TILEVIEW_GET_TILE_ACT,graphics library,function,0x101cb681,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,125
+LV_ARC_SET_BG_ANGLES,graphics library,function,0x101ccc83,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,91
+STREAM_SPACE,watch services,function,0x101ce411,0x101ee19d,located,signature,high,identical,1.00,22,,fw/wp2-core/src/stock.rs,159
+POWER_CAPACITY,watch services,function,0x101ce6fd,0x101ee471,located,callgraph,high,identical,1.00,9,,fw/wp2-core/src/stock.rs,167
+POWER_STATUS,watch services,function,0x101ce703,0x101ee477,located,callgraph,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,168
+POWER_DC5V,watch services,function,0x101ce70f,0x101ee483,located,callgraph,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,169
+VIEW_LAYOUT,screens and widgets,function,0x101d72ff,0x101f8a01,located,signature,high,identical,1.00,2,,fw/wp2-core/src/stock.rs,27
+SCENE_CLOSE,screens and widgets,function,0x101d7715,0x101f8e01,located,signature,high,identical,1.00,14,,fw/wp2-core/src/stock.rs,213
+SCENE_IMGS_FREE,screens and widgets,function,0x101d775b,0x101f8e33,located,signature,high,identical,1.00,57,,fw/wp2-core/src/stock.rs,215
+SCENE_TEXTS_FREE,screens and widgets,function,0x101d777b,0x101f8e53,located,signature,high,identical,1.00,20,,fw/wp2-core/src/stock.rs,217
+PWM_DEVICE,watch services,data,0x101df1c0,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,137
+APPLIST_LAYOUT,screens and widgets,data,0x101eb160,0x102159e4,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,src/wp2apps/firmware.py,33
+SPORT1_IMGS,screens and widgets,data,0x101ed460,0x102188c0,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,224
+SPORT1_TEXTS,screens and widgets,data,0x101ed4fc,0x1021895c,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,225
+WGT_REG,screens and widgets,data,0x101efc88,0x1021be98,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,src/wp2apps/firmware.py,37
+LEVELS,vibration tweak (optional extra),data,0x101f4a00,,unresolved,,,,,,,src/wp2apps/firmware.py,49
+LV_FONT_DEFAULT,graphics library,data,0x101fb6bc,0x102304b8,located,data-ref,high,,,4,address found; contents not compared,fw/wp2-core/src/stock.rs,69
+FONT_32M,graphics library,data,0x10201dc4,0x10238a39,conflict,data-ref,,,,8,,fw/wp2-core/src/stock.rs,230
+FONT_SANS32,graphics library,data,0x10201dee,0x10238a8d,located,data-ref-loose,medium,,,1,address found; contents not compared,fw/wp2-core/src/stock.rs,229
+SCENE_RES,screens and widgets,function,0x10203e91,0x1023b78b,located,callgraph,high,rewritten,0.30,14,"code differs: check behaviour, arguments and struct offsets",fw/wp2-core/src/stock.rs,220
+SCENE_STY,screens and widgets,data,0x10203ea6,0x1023b7a0,located,data-ref,high,,,14,address found; contents not compared,fw/wp2-core/src/stock.rs,221
+ROLLER_FORMAT,vibration tweak (optional extra),function,0x1021d65d,,unresolved,,,,,,,src/wp2apps/firmware.py,52
+WEAK_TABLE,vibration tweak (optional extra),patch-area,0x10259e80,,own-placement,,,,,,,src/wp2apps/firmware.py,55
+MOTOR_HOOK,vibration tweak (optional extra),patch-area,0x10259f00,,own-placement,,,,,,,src/wp2apps/firmware.py,45
+RTC_APP,watch services,ram,0x2ffb449c,0x2ff9c0dc,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-loader/src/svc.rs,16
+SESSION_KEY,watch services,ram,0x380029a6,0x380032f1,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,160
+CARDS_STORE,screens and widgets,ram,0x38007880,0x3800a3f8,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,146
+POPUP_FLAGS,screens and widgets,ram,0x3800faf4,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,143
+GPS_INFO,watch services,ram,0x38016c40,,unresolved,,,,,,,fw/wp2-core/src/stock.rs,203
+RETURN_CB,screens and widgets,ram,0x38019b10,0x380255c0,located,data-ref,high,,,2,address found; contents not compared,fw/wp2-core/src/stock.rs,206
+WEWEAR_CTX,watch services,ram,0x3801a658,0x380261b0,located,data-ref,high,,,3,address found; contents not compared,fw/wp2-core/src/stock.rs,157
+HEAP,"files, memory and system",ram,0x38043824,0x3805cce0,located,data-ref,high,,,10,address found; contents not compared,fw/wp2-core/src/heap.rs,1
+GPS_STATE,watch services,ram,0x380443f4,0x3805da38,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,200
+AUTHKEY,watch services,ram,0x38048e08,0x380627fb,located,data-ref,high,,,6,address found; contents not compared,fw/wp2-core/src/stock.rs,161
+HR_WEAR,watch services,ram,0x3804b30c,0x38064d9e,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,191
+HR_OWNER,watch services,ram,0x3804b30f,0x38064da1,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,193
+HR_BPM,watch services,ram,0x3804b310,0x38064da2,derived,base+offset,low,,,,address guessed from a nearby mapped base plus the same offset,fw/wp2-core/src/stock.rs,195
+HEAP_BASE,"files, memory and system",ram,0x380a9340,0x380e91c0,located,data-ref,high,,,2,address found; contents not compared,src/wp2apps/firmware.py,11
+STUB_RAM,"files, memory and system",ram,0x3871eec0,,unresolved,,,,,,,fw/wp2-core/src/layout.rs,22

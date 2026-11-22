@@ -1,0 +1,13 @@
+effect,what,steps,table_steps_ms,table_total_ms,emulator_observed_ms
+0,single buzz,1,on 200,200,on 201
+1,single buzz,1,on 400,400,on 400
+2,single long buzz,1,on 700,700,on 701
+3,slow repeating pulse (ringing),1,"on 300, off 1700",60000,"on 300, off 1765, on 301, off 1701, on 301"
+4,fast repeating pulse (alarm),1,"on 300, off 150",60000,"on 301, off 151, on 301, off 151, on 301, off 151, on 301, off 151, on 301, off 151, on 301, off 151, on 301, off 216, on ..."
+5,continuous,1,on 1000,86400000,"on 1001, off 61, on 1001, off 0, on 1001, off 0, on ..."
+6,short buzz (used at boot),1,on 60,60,on 61
+7,two pulses,1,"on 150, off 850",2000,"on 157, off 850, on 151"
+8,tick (different drive settings from the others),1,on 30,30,on 30
+9,"five short pulses, speeding up",5,"on 80, off 1000; on 80, off 800; on 80, off 650; on 80, off 400; on 80, off 500",3700,"on 81, off 1001, on 81, off 801, on 81, off 651, on 81, off 471, on 81"
+10,"five short pulses, slowing down",5,"on 80, off 400; on 80, off 700; on 80, off 1000; on 80, off 1200; on 80, off 500",4150,"on 81, off 467, on 81, off 701, on 81, off 1003, on 80, off 1263, on 81"
+11,empty,0,,0,on 36

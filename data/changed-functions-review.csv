@@ -1,0 +1,38 @@
+name,wp2_addr,wp3_addr,match_class,verdict,emulator_calls_recorded,basis,notes
+SIMPLE_IMG_SET_SRC,0x1005a02d,0x101c675d,rewritten,equivalent,3,static read of both disassemblies; called in emulator,"same calls and logic; widget fields +4 (src 0x2c->0x30, header 0x30->0x34, w/h 0x44/0x48->0x48/0x4c)"
+VIMG_SET_ZOOM,0x1005a2d1,0x101c6801,rewritten,equivalent,0,static read of both disassemblies,"same clamp-and-store; zoom 0x4e->0x52, src 0x2c->0x30"
+SEND,0x100cc2d5,0x100c0f3d,rewritten,equivalent,0,static read of both disassemblies,"writes to stream at ctx+0x18, returns 0 or -5; only the logging order differs; WEWEAR_CTX literal is 0x380261b0"
+JX_SCROLL_BAR_SET_SCROLL_OBJ,0x100d93e5,0x100d1805,rewritten,equivalent,1,static read of both disassemblies; called in emulator,identical call sequence; scroll obj field 0x58->0x5c
+JX_SCROLL_BAR_SET_KNOB,0x100d94ed,0x101d2139,rewritten,equivalent-with-caveat,0,static read of both disassemblies,"knob=true path identical (the only way the SDK calls it); knob=false on WP3 also adds HIDDEN to the bar itself; fields 0x58->0x5c, 0x70->0x78"
+UX2SYS_SET,0x100e07b9,0x100da1a1,similar,equivalent-with-caveat,1,static read of both disassemblies; called in emulator,"same table dispatch, 12-byte entries; bound 0x9e->0xd3, table 0x101f4274->0x10220de4; property IDs themselves not checked"
+EVENT_SEND,0x101259c5,0x10136a3d,rewritten,equivalent,3,static read of both disassemblies; called in emulator,"lv_event_send(obj, code, param); lv_obj_del sends codes 0x22 and 0x24 through it on both"
+LV_OBJ_ADD_EVENT_CB,0x10125a95,0x10136aa1,rewritten,equivalent,3,static read of both disassemblies; called in emulator,"same calls; spec_attr offsets unchanged (0xc, 0x2a); same vendor filter 0x2d -> LV_DISP_ADD_KNOB_OBJ"
+LV_OBJ_CLEAR_FLAG,0x10127e7d,0x101e428d,rewritten,equivalent,3,static read of both disassemblies; called in emulator,"identical call sequence; lv_obj_t fields from 0x14 up shift +4 (coords 0x14->0x18, flags 0x24->0x28, state 0x28->0x2c)"
+LV_OBJ_ADD_STATE,0x10128245,0x101e4311,rewritten,equivalent,0,static read of both disassemblies,state 0x28->0x2c; tail-calls set_state
+LV_OBJ_CLEAR_STATE,0x10128311,0x101e4323,rewritten,equivalent,0,static read of both disassemblies,state 0x28->0x2c; tail-calls set_state
+LV_OBJ_HAS_FLAG,0x101283dd,0x101e4335,rewritten,equivalent,3,static read of both disassemblies; called in emulator,all-flags test; flags 0x24->0x28; WP2 only adds asserts
+LV_DISP_ADD_KNOB_OBJ,0x10128c51,0x1013912d,similar,equivalent,0,static read of both disassemblies,instruction-for-instruction the same apart from an assert line number; disp offsets 0x268/0x26c unchanged
+LV_OBJ_ADD_FLAG,0x10128d39,0x101e4367,rewritten,equivalent,3,static read of both disassemblies; called in emulator,same calls; has_state inlined on WP3
+OBJ_SET_X,0x101290cd,0x101e4d55,rewritten,equivalent,3,static read of both disassemblies; called in emulator,same: style prop 7 compare then set
+LV_OBJ_SET_POS,0x1012926d,0x101e4db1,rewritten,equivalent,3,static read of both disassemblies; called in emulator,set_x then set_y
+LV_OBJ_SET_SIZE,0x101294c9,0x101e4e23,rewritten,equivalent,3,static read of both disassemblies; called in emulator,set_width then set_height
+OBJ_GET_Y,0x101298b9,0x101e4ef9,rewritten,equivalent,0,static read of both disassemblies,identical call sequence; y1 0x18->0x1c
+LV_OBJ_INVALIDATE_AREA,0x10129ef1,0x101e526d,rewritten,equivalent,3,static read of both disassemblies; called in emulator,identical call sequence; 16-byte areas on both
+LV_OBJ_INVALIDATE,0x10129fd9,0x101e52a9,rewritten,equivalent,3,static read of both disassemblies; called in emulator,identical call sequence; coords +4
+LV_OBJ_ALIGN_TO,0x1012a87d,0x10139c45,rewritten,equivalent-with-caveat,3,static read of both disassemblies; called in emulator,same call skeleton with get_width/get_height inlined on WP3; the per-alignment cases were not walked one by one
+LV_OBJ_GET_SCROLL_BOTTOM,0x1012ae09,0x1013a029,rewritten,equivalent,3,static read of both disassemblies; called in emulator,identical call sequence; y2 0x20->0x24
+LV_OBJ_SCROLL_TO_Y,0x1012b381,0x101e573b,rewritten,equivalent-with-caveat,3,static read of both disassemblies; called in emulator,"scroll_by(obj, 0, scroll_y - y, anim) on both, but WP2 first cancels a running scroll animation and WP3 does not"
+OBJ_ADD_STYLE,0x1012bb15,0x1013aa71,similar,equivalent,3,static read of both disassemblies; called in emulator,identical call sequence; style count bits 0x2a->0x2e
+LV_OBJ_GET_CHILD,0x1012c3dd,0x101e66bb,rewritten,equivalent,3,static read of both disassemblies; called in emulator,"spec_attr children/count unchanged (0x8 -> +0, +4); supports negative index"
+LV_OBJ_GET_CHILD_CNT,0x1012c4ad,0x101e66d9,rewritten,equivalent,3,static read of both disassemblies; called in emulator,spec_attr count unchanged
+LV_OBJ_DEL,0x1012c775,0x101e6719,rewritten,equivalent-with-caveat,3,static read of both disassemblies; called in emulator,"same event codes 0x22 and 0x24 to the parent, but WP2 also re-runs the parent layout and readjusts its scroll before them; WP3 does not (looks like a different LVGL 8.x point release)"
+LV_IMG_SET_SRC,0x1013ed51,0x1014b2f5,similar,equivalent,3,static read of both disassemblies; called in emulator,identical call sequence; all widget fields +4
+LV_LABEL_SET_TEXT,0x101400a5,0x1014c3d1,rewritten,equivalent,3,static read of both disassemblies; called in emulator,"identical call sequence; text 0x2c->0x30, flags 0x5c->0x68"
+LV_LABEL_SET_LONG_MODE,0x1014051d,0x1014c611,rewritten,equivalent-with-caveat,3,static read of both disassemblies; called in emulator,same core; WP3 first hides two extra child objects at +0x3c/+0x40 if present; label grew 12 bytes (flags 0x5c->0x68)
+LV_ROLLER_SET_SELECTED,0x10141045,0x101ed02b,rewritten,equivalent,0,static read of both disassemblies,same arithmetic and tail call; fields +4 (0x2c..0x32 -> 0x30..0x36)
+LV_ROLLER_GET_SELECTED,0x10141691,0x101ed0b7,rewritten,equivalent,0,static read of both disassemblies,same arithmetic; fields +4
+STOCK_HEAP_INIT,0x10146aa4,0x10152f18,similar,equivalent-with-caveat,2,static read of both disassemblies; called in emulator,"same arguments and calls; the heap descriptor packs its flags differently (u16+byte at 0x14/0x16 -> one u32 at 0x14). Fine for the stub, which only tail-calls it with stock arguments"
+stock_heap_init,0x10146aa5,0x10152f19,similar,equivalent-with-caveat,2,static read of both disassemblies; called in emulator,same function as STOCK_HEAP_INIT (Thumb pointer)
+ENCRYPT,0x101b605b,0x100c19d1,rewritten,equivalent-with-caveat,0,static read of both disassemblies,"same signature and result; WP3 wraps the body in a mutex (0x38005cc8, wait forever), so it must not be called from an interrupt; inner cipher routine is the mapped twin"
+DECRYPT,0x101b608d,0x100c1b65,rewritten,equivalent-with-caveat,0,static read of both disassemblies,same signature and result; WP3 wraps the body in a mutex (0x38005cb4); the inner decrypt routine was not compared
+SCENE_RES,0x10203e91,0x1023b78b,rewritten,not-a-function,0,static read of both disassemblies,"a string, not code: ""/NAND:A/bt_watch.res"" at both addresses; the address is confirmed, the ""rewritten"" label is an artefact"

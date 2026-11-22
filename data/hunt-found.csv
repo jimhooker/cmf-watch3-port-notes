@@ -1,0 +1,42 @@
+name,kind,wp2_addr,wp3_addr,was,verdict,emulator_calls_recorded,basis,notes
+LV_ARC_CREATE,function,0x1013ba55,0x10149669,unresolved,found,3,only code reference to the arc class table,the same method re-finds LV_BTN_CREATE and LV_LABEL_CREATE at their already-known addresses
+LV_BAR_CREATE,function,0x1013cea1,0x1014a385,unresolved,found,3,code reference to the bar class table,
+LV_ROLLER_CREATE,function,0x10140e01,0x1014cd05,unresolved,found,0,code reference to the roller class table,
+LV_SLIDER_CREATE,function,0x10141eb9,0x1014da09,unresolved,found,0,code reference to the slider class table,
+LV_TILEVIEW_CREATE,function,0x101380a1,0x101460b9,unresolved,found,0,only code reference to the tileview class table,
+LV_ARC_SET_BG_ANGLES,function,0x101ccc83,0x101ec431,unresolved,found,3,lv_arc.c block read in source order,calls set_bg_end then set_bg_start
+LV_ARC_SET_ROTATION,function,0x1013c055,0x101ec449,unresolved,found,3,lv_arc.c block read in source order,rotation is u16 at +0x30
+LV_ARC_SET_VALUE,function,0x1013c109,0x101ec44f,unresolved,found,3,lv_arc.c block read in source order,value/min/max are i16 at +0x3a/+0x3c/+0x3e
+LV_ARC_GET_VALUE,function,0x1013c2ed,,unresolved,absent,,no standalone function in the image (linker dropped it as unused),replace with a direct read: i16 at obj+0x3a
+LV_BAR_SET_VALUE,function,0x1013ceb9,0x101ec579,unresolved,found,3,lv_bar.c block read in source order,cur/min/max/start are i32 at +0x30/+0x34/+0x38/+0x3c
+LV_BAR_GET_VALUE,function,0x1013d079,0x101ec6b3,unresolved,found,0,lv_bar.c block read in source order,returns the animation end value while animating
+LV_BAR_SET_RANGE,function,0x1013d295,0x101ec643,unresolved,found,3,lv_bar.c block read in source order,
+LV_ROLLER_SET_OPTIONS,function,0x10140e19,0x1014cd1d,unresolved,found,0,function after LV_ROLLER_CREATE; same assert line (110) as Watch Pro 2,
+LV_TILEVIEW_GET_TILE_ACT,function,0x101cb681,0x101eab1d,unresolved,found,0,"same two-instruction getter, field +0x2c -> +0x30",
+OBJ_GET_Y2,function,0x10129b05,0x101e4f27,unresolved,found,0,function after OBJ_GET_Y: get_y + height,
+FONT_32M,data,0x10201dc4,0x10238a39,conflict,found,,string in image; file present in res_b,"path is ""/NAND:B/font32M.font"": volume B, not A as on the Watch Pro 2"
+HEAP_LITERALS,code-site,0x10188588,0x1019c700,unresolved,found,,literal slot holding the heap size 0x636B00,Watch Pro 2 size was 0x676B80
+HEAP_LITERALS,data,0x101885f4,0x1019c76c,unresolved,found,,literal slot holding the heap size 0x636B00,
+STUB_RAM,ram,0x3871eec0,0x3871ecc0,unresolved,found,,computed: heap base 0x380E91C0 + (0x636B00 - 0x1000),"own placement, follows the same rule as the Watch Pro 2 stub"
+VIEW_START_LITERALS,data,0x1018df3c,0x101a3194,unresolved,found,,literal slot holding VIEW_TABLE 0x1000050C,"0x10152624 holds the same value but bounds a neighbouring table, as 0x101461AC does on the Watch Pro 2"
+VIEW_END_LITERALS,data,0x1018df40,0x101a3198,unresolved,found,,literal slot holding VIEW_TABLE_END 0x1000136C,0x1003CC14 is the neighbouring-table twin
+RETURN_CLOCK,function,0x1005d969,0x10044f95,unresolved,found,0,"only function that logs ""jx_return_user_handle""; same prologue and calls",
+STOCK_LAYOUT,function,0x1005eee5,0x10047165,unresolved,found,0,value in the list-style descriptor at +0xC; same opening sequence,state offsets differ (0x200 -> 0x264); the descriptor has more live handlers than on the Watch Pro 2
+POPUP_FLAGS,ram,0x3800faf4,0x38015bbc,unresolved,found,,"message-box state base 0x38015B88 + 0x34, same field offsets (+0x34, +0x36, +0x38)",
+BLE_CALL,code-site,0x100d34f0,0x100c253a,unresolved,found,,default branch of the BLE dispatcher (0x100C2491),"frame pointer is r4 here, r5 on the Watch Pro 2; stock now handles opcodes up to 0x90E6 including 0x90A2, which is inside the stub range 0x90A0..0x90A7"
+PWM_DEVICE,data,0x101df1c0,0x10201748,unresolved,found,,"device struct named ""PWM"" whose driver table holds PWM_PIN_SET_CYCLES",
+WAKE_UNLOCK,function,0x100c1859,0x100b4c45,unresolved,found,1,matching helper call sites in jx_sys_lock,"largest id is 0x150 here (0x124 on the Watch Pro 2), and the id thresholds moved with it"
+TIME_ZONE,function,0x100c1459,0x100b3ced,unresolved,replaced,3,time module rewritten around UTC seconds,"fn(ts: u32) -> i32 zone offset in seconds, DST-aware; pass 0 for ""now"". Not a drop-in: the Watch Pro 2 function took no argument"
+RTC_GET_TIME,function,0x100c14b5,0x101d0cbf,unresolved,replaced,0,time module rewritten around UTC seconds,"no single call: ts = 0x100B3CCD() then 0x101D0CBF(ts, *rtc_time) fills local time; same rtc_time layout"
+GPS_INFO,ram,0x38016c40,0x38020c68,unresolved,found,,block cleared and filled after the GGA parser,"size 0xA8 (0x68 on the Watch Pro 2); latitude is at +0x68, not +0x38; other field offsets not yet read"
+APPLIST_LAYOUT,data,0x101eb160,0x10215a64,derived,guess-corrected,,list-style descriptor found by its header; slot is descriptor +0xC,earlier guess 0x102159E4 was wrong
+SPORT1_TEXTS,data,0x101ed4fc,0x102189a0,derived,guess-corrected,,table found by content (first ten ids identical),earlier guess 0x1021895C was wrong
+SPORT1_IMGS,data,0x101ed460,0x102188c0,derived,guess-supported,,table starts with the same four ids,"contents diverge after the fourth id (extra ids inserted), so positions must be re-derived"
+WGT_REG,data,0x101efc88,0x1021bea0,derived,guess-corrected,,table read by the registry accessor at 0x1009498C,"earlier guess 0x1021BE98 was wrong. Only 24 slots, ids 0..23, no free slot: the stub cannot reuse its ""id 0x40"" trick"
+SESSION_KEY,ram,0x380029a6,0x380032f2,derived,guess-corrected,,returned by the key-select function next to AUTHKEY,earlier guess 0x380032F1 was off by one
+CARDS_STORE,ram,0x38007880,0x3800a404,derived,guess-corrected,,buffer loaded by the 0x906D card-settings handler at the same point,earlier guess 0x3800A3F8 was wrong
+RTC_APP,ram,0x2ffb449c,0x2ff9c180,derived,replaced,,time module state,layout changed: no zone hour/minute bytes; RTC device pointer is at +0x24. Earlier guess 0x2FF9C0DC was wrong
+HR_WEAR,ram,0x3804b30c,0x38064d9e,derived,guess-supported,,two matched functions reference neighbours at the same relative offset,a third reference disagrees by one byte
+HR_OWNER,ram,0x3804b30f,0x38064da1,derived,guess-supported,,follows HR_WEAR (+3) if the fields are still contiguous,not independently checked
+HR_BPM,ram,0x3804b310,0x38064da2,derived,guess-supported,,follows HR_WEAR (+4) if the fields are still contiguous,not independently checked
+GPS_STATE,ram,0x380443f4,,derived,not-re-derived,,earlier guess 0x3805DA38 is not referenced by any code,the GPS service was rewritten for the new receiver; needs its own pass
