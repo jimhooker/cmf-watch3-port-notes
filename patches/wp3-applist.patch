@@ -1,0 +1,418 @@
+diff --git a/fw/wp3-stub/Cargo.toml b/fw/wp3-stub/Cargo.toml
+index 0261dde..dfc5c7b 100644
+--- a/fw/wp3-stub/Cargo.toml
++++ b/fw/wp3-stub/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "wp3-stub"
+-description = "Stub appended to the Watch 3 Pro stock app.bin: the boot watch face guard only"
++description = "Stub appended to the Watch 3 Pro stock app.bin: the boot watch face guard and an Apps entry in the app list"
+ edition.workspace = true
+ license.workspace = true
+ version.workspace = true
+diff --git a/fw/wp3-stub/src/applist.rs b/fw/wp3-stub/src/applist.rs
+new file mode 100644
+index 0000000..b96ad7c
+--- /dev/null
++++ b/fw/wp3-stub/src/applist.rs
+@@ -0,0 +1,272 @@
++// "Apps" entry in the stock app list of the Watch 3 Pro (jx402_08 1.0.1.77), in the List and in the Grid style.
++//
++// Both hooks replace a style descriptor's update handler (+0x10). The stock view procedure calls it right after
++// the layout, and the stock update rebuilds the screen through a direct call to the layout when an optional
++// entry appears or goes, so the layout slot alone would lose the entry. No writable statics: the entry is there
++// when the container has one child more than the stock entries shown.
++use core::mem::transmute;
++
++const LIST_UPDATE: u32 = 0x10047351;
++const GRID_UPDATE: u32 = 0x10046D99;
++const GRID_PLACE: u32 = 0x101C70EB;
++const UI_MEM_ALIGNED_ALLOC: u32 = 0x1019C389;
++const UI_MEM_FREE: u32 = 0x1019C445;
++const PSRAM_CACHE_FLUSH_INVALIDATE: u32 = 0x101DC72F;
++const OBJ_CREATE: u32 = 0x10138B49;
++const OBJ_GET_CHILD: u32 = 0x101E66BB;
++const OBJ_GET_CHILD_CNT: u32 = 0x101E66D9;
++const OBJ_SET_SIZE: u32 = 0x101E4E23;
++const OBJ_ALIGN: u32 = 0x101E4E85;
++const OBJ_ALIGN_TO: u32 = 0x10139C45;
++const OBJ_ADD_FLAG: u32 = 0x101E4367;
++const OBJ_ADD_EVENT_CB: u32 = 0x10136AA1;
++const OBJ_ADD_STYLE: u32 = 0x1013AA71;
++const EVENT_SEND: u32 = 0x10136A3D;
++const EVENT_GET_USER_DATA: u32 = 0x101E37D3;
++const IMG_CREATE: u32 = 0x10041959;
++const IMG_SET_SRC: u32 = 0x101C675D;
++const IMG_SET_PIVOT: u32 = 0x101C67A7;
++const LABEL_CREATE: u32 = 0x1014BB49;
++const LABEL_SET_LONG_MODE: u32 = 0x1014C611;
++const LABEL_SET_STRING_DSC: u32 = 0x1014C5D1;
++const LABEL_SCROLL_SETUP: u32 = 0x101ECE0B;
++const VIBRATE: u32 = 0x100DA77D;
++
++// view data (`*(view + 0x14)`): the screen is the first word in both styles
++const FLAGS: usize = 0x290; // bit0 entry 11, bit1 entry 9, bit2 entry 10 are shown
++const LIST_CONT: usize = 0x4;
++const LIST_COUNT: usize = 0x8;
++const LIST_STYLE: usize = 0x264;
++const LIST_LINE_HEIGHT: usize = 0x274;
++const GRID_OBJS: usize = 0x16C;
++const GRID_CONT: usize = 0x1E4;
++const GRID_COUNT: usize = 0x1E8;
++const GRID_LOWEST: usize = 0x1F8;
++
++const ENTRIES: u8 = 30;
++const ALWAYS_SHOWN: u32 = 27;
++const LIST_ICON: usize = 96;
++const GRID_ICON: usize = 160;
++const RES: u32 = 2;
++const SHORT_CLICKED: u32 = 4;
++const SCROLL: u32 = 11;
++const DELETE: u32 = 33;
++const HIDDEN: u32 = 1;
++const CLICKABLE: u32 = 2;
++const EVENT_BUBBLE: u32 = 0x4000;
++const ALIGN_TOP_LEFT: u32 = 1;
++const OUT_BOTTOM_LEFT: u32 = 0xD;
++const OUT_RIGHT_MID: u32 = 0x14;
++
++// Like the stock icons: LV_IMG_CF_TRUE_COLOR_ALPHA (RGB565 LE + alpha), a filled circle with a light glyph, behind
++// the 64-byte header the stock resource cache puts before its pixels (the emulator's GPU model reads it).
++const HEAD: usize = 64;
++const CIRCLE: u16 = 0x18C3; // the stock icons' circle on this watch
++const GLYPH: u16 = 0xF79E;
++
++type Obj = *mut u8;
++
++#[repr(C)]
++struct ImgDsc {
++    header: u32,
++    size: u32,
++    data: *const u8,
++}
++
++#[repr(C)]
++struct TextRec {
++    text: *const u8,
++    zero: u32,
++}
++
++unsafe impl Sync for TextRec {}
++
++static LABEL: TextRec = TextRec { text: b"Apps\0".as_ptr(), zero: 0 };
++
++macro_rules! stock {
++    ($addr:expr, fn($($t:ty),*) -> $r:ty) => {
++        unsafe { transmute::<usize, extern "C" fn($($t),*) -> $r>($addr as usize) }
++    };
++}
++
++pub extern "C" fn wp3_applist_list(view: *mut u8) {
++    stock!(LIST_UPDATE, fn(*mut u8) -> ())(view);
++    unsafe { add_row(view) };
++}
++
++pub extern "C" fn wp3_applist_grid(view: *mut u8) {
++    stock!(GRID_UPDATE, fn(*mut u8) -> ())(view);
++    unsafe { add_icon(view) };
++}
++
++/// The view data and its container when the stock layout has run and our entry is not there yet, with the
++/// number of stock entries shown.
++unsafe fn stock_state(view: *mut u8, cont: usize, count: usize) -> Option<(*mut u8, Obj, u32)> {
++    let data = unsafe { *(view.add(0x14) as *const *mut u8) };
++    if data.is_null() || unsafe { *(data as *const Obj) }.is_null() {
++        return None;
++    }
++    let cont = unsafe { *(data.add(cont) as *const Obj) };
++    if cont.is_null() || unsafe { *data.add(count) } != ENTRIES {
++        return None;
++    }
++    let shown = ALWAYS_SHOWN + (unsafe { *data.add(FLAGS) } & 7).count_ones();
++    (stock!(OBJ_GET_CHILD_CNT, fn(Obj) -> u32)(cont) == shown).then_some((data, cont, shown))
++}
++
++// A row built like the stock rows (0x10047164), shown first; the stock fisheye (0x10047008) walks every child.
++unsafe fn add_row(view: *mut u8) {
++    let Some((data, cont, shown)) = (unsafe { stock_state(view, LIST_CONT, LIST_COUNT) }) else { return };
++    let Some((block, dsc)) = icon_block(LIST_ICON) else { return };
++    let align_to = stock!(OBJ_ALIGN_TO, fn(Obj, Obj, u32, i32, i32) -> ());
++    let add_flag = stock!(OBJ_ADD_FLAG, fn(Obj, u32) -> ());
++    let set_size = stock!(OBJ_SET_SIZE, fn(Obj, i32, i32) -> ());
++    let add_cb = stock!(OBJ_ADD_EVENT_CB, fn(Obj, extern "C" fn(*mut u8), u32, *mut u8) -> *mut u8);
++    let row = stock!(OBJ_CREATE, fn(Obj) -> Obj)(cont);
++    let img = if row.is_null() { row } else { stock!(IMG_CREATE, fn(Obj) -> Obj)(row) };
++    if img.is_null() {
++        free(block);
++        return;
++    }
++    add_cb(img, freed, DELETE, block);
++    set_size(row, 0x18A, LIST_ICON as i32);
++    add_cb(row, clicked, SHORT_CLICKED, core::ptr::null_mut());
++    stock!(OBJ_ALIGN, fn(Obj, u32, i32, i32) -> ())(row, ALIGN_TOP_LEFT, 0x10, 0x50);
++    add_flag(img, EVENT_BUBBLE);
++    stock!(IMG_SET_SRC, fn(Obj, *const ImgDsc) -> ())(img, dsc);
++    let lab = stock!(LABEL_CREATE, fn(Obj) -> Obj)(row);
++    if !lab.is_null() {
++        set_size(lab, 0x172 - LIST_ICON as i32, unsafe { *(data.add(LIST_LINE_HEIGHT) as *const i32) });
++        stock!(OBJ_ADD_STYLE, fn(Obj, *mut u8, u32) -> ())(lab, unsafe { data.add(LIST_STYLE) }, 0);
++        stock!(LABEL_SET_LONG_MODE, fn(Obj, u32) -> ())(lab, 3);
++        stock!(LABEL_SET_STRING_DSC, fn(Obj, *const TextRec) -> ())(lab, &LABEL);
++        stock!(LABEL_SCROLL_SETUP, fn(Obj, u32, i32, u32) -> ())(lab, 0, -1, 0);
++        add_flag(lab, EVENT_BUBBLE);
++        align_to(lab, img, OUT_RIGHT_MID, 0x18, 0);
++    }
++    let get_child = stock!(OBJ_GET_CHILD, fn(Obj, i32) -> Obj);
++    let mut prev = row;
++    for i in 0..shown as i32 {
++        let r = get_child(cont, i);
++        align_to(r, prev, OUT_BOTTOM_LEFT, 0, 8);
++        prev = r;
++    }
++    stock!(EVENT_SEND, fn(Obj, u32, *mut u8) -> u32)(cont, SCROLL, core::ptr::null_mut());
++}
++
++// One more icon after the stock ones (layout 0x10046B6C): the stock position function takes the count from the
++// container and the objects from a 30-pointer array, so the entry needs a stock entry to be hidden.
++unsafe fn add_icon(view: *mut u8) {
++    let Some((data, cont, shown)) = (unsafe { stock_state(view, GRID_CONT, GRID_COUNT) }) else { return };
++    if shown >= ENTRIES as u32 {
++        return;
++    }
++    let Some((block, dsc)) = icon_block(GRID_ICON) else { return };
++    let add_flag = stock!(OBJ_ADD_FLAG, fn(Obj, u32) -> ());
++    let add_cb = stock!(OBJ_ADD_EVENT_CB, fn(Obj, extern "C" fn(*mut u8), u32, *mut u8) -> *mut u8);
++    let img = stock!(IMG_CREATE, fn(Obj) -> Obj)(cont);
++    if img.is_null() {
++        free(block);
++        return;
++    }
++    unsafe { *(data.add(GRID_OBJS + 4 * shown as usize) as *mut Obj) = img };
++    add_cb(img, freed, DELETE, block);
++    stock!(IMG_SET_SRC, fn(Obj, *const ImgDsc) -> ())(img, dsc);
++    stock!(IMG_SET_PIVOT, fn(Obj, i32, i32) -> ())(img, GRID_ICON as i32 / 2, GRID_ICON as i32 / 2);
++    add_flag(img, HIDDEN);
++    add_cb(img, clicked, SHORT_CLICKED, core::ptr::null_mut());
++    add_flag(img, CLICKABLE);
++    add_flag(img, EVENT_BUBBLE);
++    // three icons per row, 160 px apart
++    unsafe { *(data.add(GRID_LOWEST) as *mut i32) = 480 - 160 * ((shown as i32 + 3) / 3) };
++    stock!(GRID_PLACE, fn(*mut u8) -> ())(data);
++}
++
++/// The icon in a RES block: [64 B header][size x size pixels][ImgDsc]. Freed with `free(block)`.
++fn icon_block(size: usize) -> Option<(*mut u8, *const ImgDsc)> {
++    let pixels_len = size * size * 3;
++    let total = HEAD + pixels_len + size_of::<ImgDsc>();
++    let alloc = stock!(UI_MEM_ALIGNED_ALLOC, fn(u32, u32, u32, *const u8) -> *mut u8);
++    let block = alloc(RES, 0x40, total as u32, b"wp3\0".as_ptr());
++    if block.is_null() {
++        return None;
++    }
++    let (pixels, dsc) = unsafe { (block.add(HEAD), block.add(HEAD + pixels_len) as *mut ImgDsc) };
++    unsafe {
++        let head = core::slice::from_raw_parts_mut(block as *mut u32, HEAD / 4);
++        head.fill(0);
++        (head[2], head[4], head[5], head[6], head[8]) = ((HEAD + pixels_len) as u32, size as u32, size as u32, 3, pixels as u32);
++        draw_icon(core::slice::from_raw_parts_mut(pixels, pixels_len), size);
++        dsc.write(ImgDsc { header: 5 | (size as u32) << 10 | (size as u32) << 21, size: pixels_len as u32, data: pixels });
++    }
++    // pixels written through the cached PSRAM mapping must reach PSRAM before the display reads them
++    unsafe { core::arch::asm!("dsb sy", options(nostack)) };
++    stock!(PSRAM_CACHE_FLUSH_INVALIDATE, fn(*mut u8, u32) -> i32)(block, total as u32);
++    unsafe { core::arch::asm!("dsb sy", "isb sy", options(nostack)) };
++    Some((block, dsc))
++}
++
++fn free(block: *mut u8) {
++    stock!(UI_MEM_FREE, fn(u32, *mut u8) -> ())(RES, block);
++}
++
++extern "C" fn freed(e: *mut u8) {
++    free(stock!(EVENT_GET_USER_DATA, fn(*mut u8) -> *mut u8)(e));
++}
++
++// Placeholder until there is a loader to open: one long buzz (strength 0x7F, effect 2).
++extern "C" fn clicked(_e: *mut u8) {
++    stock!(VIBRATE, fn(u32, u32) -> ())(0x7F, 2);
++}
++
++// Own artwork (as on the Watch Pro 2 stub): a filled circle with a 2x2 grid of rounded squares, antialiased;
++// distances in 1/16 px, sizes given for a 96 px icon and scaled.
++fn draw_icon(out: &mut [u8], size: usize) {
++    let scale = |px: i32| px * 16 * size as i32 / 96;
++    let (c, sq, gap, r) = (size as i32 * 8, scale(17), scale(6), scale(5));
++    for y in 0..size {
++        for x in 0..size {
++            let (px, py) = (x as i32 * 16 + 8 - c, y as i32 * 16 + 8 - c);
++            let circle = cover(isqrt(px * px + py * py) - c);
++            // each square's centre is (sq + gap) / 2 from the icon centre on both axes
++            let (qx, qy) = (px.abs() - (sq + gap) / 2, py.abs() - (sq + gap) / 2);
++            let (qx, qy) = (qx.abs() - (sq / 2 - r), qy.abs() - (sq / 2 - r));
++            let glyph = cover(isqrt(qx.max(0).pow(2) + qy.max(0).pow(2)) + qx.max(qy).min(0) - r);
++            let colour = mix(CIRCLE, GLYPH, glyph);
++            let i = (y * size + x) * 3;
++            out[i..i + 3].copy_from_slice(&[colour as u8, (colour >> 8) as u8, (circle * 255 / 16) as u8]);
++        }
++    }
++}
++
++// 0..=16 of a pixel covered by a shape whose edge is `d` (1/16 px, negative inside) from the pixel centre
++fn cover(d: i32) -> i32 {
++    (8 - d).clamp(0, 16)
++}
++
++fn mix(a: u16, b: u16, t: i32) -> u16 {
++    let ch = |shift: u32, mask: i32| {
++        let (ca, cb) = ((a >> shift) as i32 & mask, (b >> shift) as i32 & mask);
++        (((ca * (16 - t) + cb * t + 8) / 16) as u16) << shift
++    };
++    ch(11, 31) | ch(5, 63) | ch(0, 31)
++}
++
++fn isqrt(n: i32) -> i32 {
++    let mut x = n as u32;
++    let mut r = 0u32;
++    let mut bit = 1u32 << 30;
++    while bit > x {
++        bit >>= 2;
++    }
++    while bit != 0 {
++        if x >= r + bit {
++            x -= r + bit;
++            r = (r >> 1) + bit;
++        } else {
++            r >>= 1;
++        }
++        bit >>= 2;
++    }
++    r as i32
++}
+diff --git a/fw/wp3-stub/src/main.rs b/fw/wp3-stub/src/main.rs
+index 490646e..1ee0581 100644
+--- a/fw/wp3-stub/src/main.rs
++++ b/fw/wp3-stub/src/main.rs
+@@ -1,7 +1,10 @@
+ #![no_std]
+ #![no_main]
+-// Watch 3 Pro (jx402_08 1.0.1.77): only the watch face guard (wp2-core wfguard.rs). `wp2apps firmware --model wp3`
+-// appends this at 0x102BD280 and points the stock's calls at the header's hooks (src/wp2apps/firmware.py, GUARD_WP3).
++// Watch 3 Pro (jx402_08 1.0.1.77): the watch face guard (wp2-core wfguard.rs) and an "Apps" entry in the stock app
++// list (applist.rs). `wp2apps firmware --model wp3` appends this at 0x102BD280 and points the stock's calls and
++// handler slots at the header's hooks (src/wp2apps/firmware.py, GUARD_WP3 and APPLIST_WP3).
++mod applist;
++
+ use core::ffi::c_void;
+ use wp2_core::wfguard::{self, Timers, WP3};
+ 
+@@ -14,18 +17,23 @@ pub struct Header {
+     power_down: extern "C" fn(),
+     forced_reboot: extern "C" fn(),
+     wf_parse: extern "C" fn(*mut u8, *mut u8) -> i32,
++    /// version 2: the update handlers of the app list's List and Grid style (applist.rs)
++    applist_list: extern "C" fn(*mut u8),
++    applist_grid: extern "C" fn(*mut u8),
+ }
+ 
+ #[used]
+ #[unsafe(link_section = ".header")]
+ pub static HEADER: Header = Header {
+     magic: *b"WP3S",
+-    version: 1,
++    version: 2,
+     wf_boot: wp3_wf_boot,
+     wf_saved: wp3_wf_saved,
+     power_down: wp3_power_down,
+     forced_reboot: wp3_forced_reboot,
+     wf_parse: wp3_wf_parse,
++    applist_list: applist::wp3_applist_list,
++    applist_grid: applist::wp3_applist_grid,
+ };
+ 
+ #[unsafe(no_mangle)]
+diff --git a/src/wp2apps/firmware.py b/src/wp2apps/firmware.py
+index daa3f22..7092b3c 100644
+--- a/src/wp2apps/firmware.py
++++ b/src/wp2apps/firmware.py
+@@ -50,6 +50,10 @@ WP3_STOCK_SHA256_PREFIX = "815a21fc80aa3941"
+ WP3_STUB_OFFSET = 0x2BD280
+ WP3_STUB_MAX = 0x1000
+ WP3_STUB_HEADER = struct.Struct("<4sI5I")
++# header version 2 adds the app list's update handlers (fw/wp3-stub/src/applist.rs)
++WP3_STUB_HEADER_V2 = struct.Struct("<4sI7I")
++# (rodata slot, its stock handler): +0x10 of the List and of the Grid style descriptor, in the header's order
++APPLIST_WP3 = ((0x10215A68, 0x10047351), (0x10215948, 0x10046D99))
+ GUARD_WP3 = (
+     (0x100D6E20, 0x101D5A02, WF_BOOT),
+     (0x100A5D84, 0x100D577C, WF_SAVED),
+@@ -302,7 +306,8 @@ def put_guard(out: bytearray, sites: tuple, hooks: list[int]) -> None:
+ 
+ 
+ def patch_wp3(app: bytes, stub: bytes) -> bytes:
+-    """Watch 3 Pro: appends fw/wp3-stub (the watch face guard only) and points the GUARD_WP3 calls at it."""
++    """Watch 3 Pro: appends fw/wp3-stub and points the GUARD_WP3 calls and, from header version 2, the APPLIST_WP3
++    slots at it."""
+     if not hashlib.sha256(app).hexdigest().startswith(WP3_STOCK_SHA256_PREFIX):
+         raise ValueError("not the stock jx402_08 1.0.1.77 app.bin (sha256 mismatch)")
+     out = bytearray(app)
+@@ -313,9 +318,13 @@ def patch_wp3(app: bytes, stub: bytes) -> bytes:
+ 
+ 
+ def add_stub_wp3(out: bytearray, stub: bytes) -> None:
+-    magic, version, *guard = WP3_STUB_HEADER.unpack_from(stub)
++    magic, version = struct.unpack_from("<4sI", stub)
++    if magic != b"WP3S" or version not in (1, 2):
++        raise ValueError("bad stub header")
++    hooks = (WP3_STUB_HEADER if version == 1 else WP3_STUB_HEADER_V2).unpack_from(stub)[2:]
++    guard, applist = hooks[:5], hooks[5:]
+     base = APP_VBASE + WP3_STUB_OFFSET
+-    if magic != b"WP3S" or version != 1 or not all(p & 1 and base <= p & ~1 < base + len(stub) for p in guard):
++    if not all(p & 1 and base <= p & ~1 < base + len(stub) for p in hooks):
+         raise ValueError("bad stub header")
+     if len(stub) > WP3_STUB_MAX:
+         raise ValueError(f"stub takes {len(stub):#x} bytes; the limit is {WP3_STUB_MAX:#x}")
+@@ -324,6 +333,8 @@ def add_stub_wp3(out: bytearray, stub: bytes) -> None:
+     out += stub
+     out += bytes(-len(out) % 4)
+     put_guard(out, GUARD_WP3, guard)
++    for (slot, stock), hook in zip(APPLIST_WP3, applist):
++        put(out, slot, struct.pack("<I", stock), struct.pack("<I", hook))
+ 
+ 
+ def changed_ranges(old: bytes, new: bytes, gap: int = 16) -> list[tuple[int, int]]:
+diff --git a/tests/test_firmware.py b/tests/test_firmware.py
+index 597e7e4..dfafcf6 100644
+--- a/tests/test_firmware.py
++++ b/tests/test_firmware.py
+@@ -334,6 +334,31 @@ class FirmwareTest(unittest.TestCase):
+             with self.assertRaisesRegex(ValueError, "stub"):
+                 firmware.add_stub_wp3(bytearray(app), bad)
+ 
++    def test_wp3_applist_slots_patched(self):
++        hooks = [0x102BD29D, 0x102BD2A1, 0x102BD2A9, 0x102BD2B1, 0x102BD2B9, 0x102BD2C1, 0x102BD2C9]
++        app = bytearray(firmware.WP3_STUB_OFFSET)
++        for at, stock, _ in firmware.GUARD_WP3:
++            app[at - 0x10000000:at - 0x10000000 + 4] = firmware.thumb_bl(at, stock)
++        for slot, stock in firmware.APPLIST_WP3:
++            struct.pack_into("<I", app, slot - 0x10000000, stock)
++        out = bytearray(app)
++        firmware.add_stub_wp3(out, b"WP3S" + struct.pack("<8I", 2, *hooks) + bytes(0x40))
++        for (slot, _), hook in zip(firmware.APPLIST_WP3, hooks[5:]):
++            self.assertEqual(struct.unpack_from("<I", out, slot - 0x10000000)[0], hook, hex(slot))
++        # a version 1 stub leaves the slots alone
++        out = bytearray(app)
++        firmware.add_stub_wp3(out, wp3_stub(hooks[:5]))
++        for slot, stock in firmware.APPLIST_WP3:
++            self.assertEqual(struct.unpack_from("<I", out, slot - 0x10000000)[0], stock, hex(slot))
++        stale = bytearray(app)
++        struct.pack_into("<I", stale, firmware.APPLIST_WP3[0][0] - 0x10000000, 0)
++        for bad, error in ((b"WP3S" + struct.pack("<8I", 3, *hooks) + bytes(0x40), "stub"),
++                           (b"WP3S" + struct.pack("<8I", 2, *hooks[:6], 0x102BD2C8) + bytes(0x40), "stub")):
++            with self.assertRaisesRegex(ValueError, error):
++                firmware.add_stub_wp3(bytearray(app), bad)
++        with self.assertRaisesRegex(ValueError, "unexpected bytes"):
++            firmware.add_stub_wp3(stale, b"WP3S" + struct.pack("<8I", 2, *hooks) + bytes(0x40))
++
+     @skipUnless(STOCK_WP3 is not None, "needs JX402_w3pro_V1.0.1.77.bin")
+     def test_wp3_stock_patch(self):
+         self.assertEqual(len(STOCK_WP3), firmware.WP3_STUB_OFFSET)

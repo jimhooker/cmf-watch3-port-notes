@@ -1,0 +1,55 @@
+item,kind,wp2,wp3,basis,notes
+entry table,data,0x101EAF40,0x10215788,static,"12-byte entries {icon id, text id, target}: 25 on the Watch Pro 2, 30 on the Watch 3 Pro; all 25 old entries are still there, new ones at 1, 10, 11, 12, 29"
+entry target rule,rule,<= 0xF4 is a view id,< 0x118 is a view id,static,otherwise the target is a function; rule read at 0x10046712
+ops table,data,0x101EB06C,0x102158F0,static,"{get style, get saved scroll, save scroll, click(index)}; sits right after the entry table, so the table cannot grow in place"
+view descriptor,data,0x101EB07C,0x10215900,static,view id 0x12; data size 0x230 -> 0x294; its handlers forward to the selected style descriptor
+style table,data,0x101EB0AC,0x10215930,static,"[0] list on both; [1] waterfall on the Watch Pro 2, grid on the Watch 3 Pro"
+style property,property id,0x2C,0x2F,static + emulator,0 = List and 1 = Grid on the Watch 3 Pro; forcing the getter's return to 1 gave the Grid in the emulator
+style getter,function,0x101AD185,0x101C6FA9,static,ops[0]; returns the property above as a byte
+list descriptor,data,0x101EB154,0x10215A58,static + emulator,data size 0x22C -> 0x28C; the emulator's default
+grid descriptor,data,0x101EB0B4,0x10215938,static + emulator,dead on the Watch Pro 2 (upstream docs/recon.md); live on the Watch 3 Pro; data size 0x19C -> 0x210
+waterfall descriptor,data,0x101EB184,0x10215A88,static,live on the Watch Pro 2; no longer in the style table on the Watch 3 Pro
+grid icon map,data,0x101EB0E4,0x10215968,static,"Watch 3 Pro: 30 pairs {list icon id, grid icon id}"
+generic view procedure,function,,0x100CFDB9,static + emulator,"the layout message calls descriptor +0xC (layout) and then +0x10 (update); +0x1C preload, +0x20 unload, +0x24 resource reload"
+selected descriptor pointer,view data offset,,0x28C,static + emulator,"set by the view preload 0x101C706B; the dispatchers at 0x101C6FE5..0x101C703F read it"
+visibility flags,view data offset,,0x290,static + emulator,"bit0 shows entry 11 (needs the ChatGPT flag 0x101887B1() and property 0xA6), bit1 shows entry 9 (property 0xCF), bit2 shows entry 10 (property 0xD3 reads 0); emulator value 0x04: 28 of 30 entries shown"
+click by index,function,0x1005E791,0x100466E5,static + emulator,ops[3]; index < 25 -> index < 30
+list layout,function,0x1005EEE5,0x10047165,static + emulator,descriptor +0xC; rodata slot 0x101EB160 -> 0x10215A64
+list update,function,(empty),0x10047351,static,"descriptor +0x10, slot 0x10215A68; when the visibility flags change it clears the screen and calls the stock layout directly, not through the slot"
+list preload,function,0x1005EC9D,0x10046F0D,static,loads 30 icons and 30 texts; font /NAND:A/font32M.font -> /NAND:A/font36M.font
+list unload,function,0x1005EC51,0x10046EC1,static,"saves the scroll, lv_obj_clean(screen), frees icons and texts by the count at +8"
+list resource reload,function,0x1005EBE1,0x100473F5,static,descriptor +0x24; reloads the texts and calls the update function directly
+list click callback,function,0x1005ED75,0x10046FE5,static + emulator,on event 4; reads the row's user_data (obj+0x10) as the entry index
+list fisheye,function,0x1005ED99,0x10047009,static + emulator,"container event 11, user data = view data; same formulas; the Watch 3 Pro walks every child of the container, the Watch Pro 2 walked the first count rows; skips rows that are off screen"
+list data: container,view data offset,0x4,0x4,static + emulator,
+list data: count,view data offset,0x8,0x8,static + emulator,u8; 25 -> 30; the container has fewer children when entries are hidden
+list data: icon descriptors,view data offset,0xC,0xC,static + emulator,"12 bytes each; 96 x 96, colour format 5 or 10"
+list data: text records,view data offset,0x138,0x174,static + emulator,"8 bytes each {text pointer, 0}"
+list data: label style,view data offset,0x200,0x264,static + emulator,
+list data: font,view data offset,0x20C,0x26C,static + emulator,
+list data: line height,view data offset,0x214,0x274,static + emulator,39 -> 47; used as the label height
+list row,recipe,vendor label,plain LVGL label,static + emulator,"same geometry as the Watch Pro 2 (0x18A wide, first row at (0x10, 0x50), 8 px apart, label 0x172 - icon width, label right of the icon by 0x18); the text now goes through lv_label_set_string_dsc"
+lv_label_set_string_dsc,function,,0x1014C5D1,static + emulator,"(label, text record); new on the Watch 3 Pro, 116 callers"
+label scroll setup,function,,0x101ECE0B,static + emulator,"called by the stock row as (label, 0, -1, 0) after the text is set"
+grid layout,function,0x1005E9D9,0x10046B6D,static + emulator,descriptor +0xC; rodata slot 0x10215944
+grid update,function,(empty),0x10046D99,static,"descriptor +0x10, slot 0x10215948; rebuilds through a direct call to the stock layout when the visibility flags change"
+grid preload,function,0x1005E939,0x10046AD5,static,maps each icon id through the grid icon map and loads 30 icons
+grid unload,function,,0x10046D49,static,"deletes the timer, saves the position, lv_obj_clean(screen), frees the icons"
+grid click callback,function,,0x100467F9,static + emulator,on event 4 on each icon; reads the icon's user_data (obj+0x10) as the entry index
+grid position function,function,,0x101C70EB,static + emulator,"(view data); places, zooms and hides every icon from the position at +0x1FC; takes the icon count from the container's child count and the objects from the array at +0x16C"
+grid scroll step,function,,0x10046839,static,"(view data, delta, animate, snap); the touch callback 0x10046E51 and the crown callback 0x10046A0D (event 0x2D) call it"
+grid data: icon descriptors,view data offset,,0x4,static + emulator,"12 bytes each; 160 x 160, colour format 5 (3 bytes per pixel)"
+grid data: icon objects,view data offset,,0x16C,static + emulator,"30 pointers, one per shown entry, in order; the next word (+0x1E4) is the container, so there is room for a 31st icon only when an entry is hidden"
+grid data: container,view data offset,,0x1E4,static + emulator,not scrollable; the stock code moves the icons itself
+grid data: count,view data offset,,0x1E8,static + emulator,u8; always 30
+grid data: lowest position,view data offset,,0x1F8,static + emulator,"480 - 160 * rows, three icons per row; emulator: -1120 for 28 icons"
+grid data: position,view data offset,,0x1FC,static + emulator,
+grid data: timer,view data offset,,0x208,static + emulator,
+grid data: scroll bar,view data offset,,0x20C,static + emulator,
+simple_img set pivot,function,,0x101C67A7,static + emulator,"(img, x, y); the grid passes half the icon size"
+lv_event_get_current_target,function,0x101C4C97,0x101E37C3,static,
+lv_timer_handler,function,0x1013B1D1,0x10148F31,static + emulator,entered by the UI thread every few milliseconds; used as the anchor for emulator calls when the screen is idle
+ChatGPT flag getter,function,,0x101887B1,static,"returns the byte at 0x38084C32; the setter logs ""set chatgpt fun flag %d"""
+icon block header,data layout,same,same,emulator,"64 bytes before the pixels: word 2 = 64 + pixel bytes, words 4 and 5 = width and height, word 6 = bytes per pixel (3 for colour format 5), word 8 = pixel pointer"
+extra row in List,recipe,upstream stub,works,emulator,"scripts/emu_applist_add.py list: a row built with the stock calls shows first, gets the stock fisheye, scrolls, and a tap opens its target"
+extra icon in Grid,recipe,none,works with a free slot,emulator,"scripts/emu_applist_add.py grid: one more simple_img in the container, its pointer in the first free slot of the array at +0x16C, the stock position function; a tap opens its target. Not possible when all 30 stock entries are shown"
