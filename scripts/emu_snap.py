@@ -17,6 +17,8 @@ usage: scripts/emu_snap.py PATH_TO_cmf-watch-utils WORK_DIR RUN_NAME [OPTION ...
                                "r delta"). The screen is 466 x 466.
   --shot SECONDS:NAME          SECONDS after the watch face appears, save the screen as snap/NAME.png.
   --max-hits N                 stops recorded per LABEL (default 2).
+  --attach boot|face           when the debugger attaches: once the watch face shows (default), or as soon as the
+                               emulator starts, so that stops during the boot itself are recorded too.
 
 Output in WORK_DIR/runs/RUN_NAME/snap: stops.txt (one line per stop with the registers), the .bin dumps and shots.
 Set EMU_APP=path/to/app.bin to boot a modified app image instead of the stock one.
@@ -49,7 +51,8 @@ def input_lines(what):
 
 def main():
     utils, work, name = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve(), sys.argv[3]
-    options = {"--at": [], "--save": [], "--force": [], "--input": [], "--shot": [], "--max-hits": []}
+    options = {"--at": [], "--save": [], "--force": [], "--input": [], "--shot": [], "--max-hits": [],
+               "--attach": []}
     args = sys.argv[4:]
     while args:
         key = args.pop(0)
@@ -68,8 +71,31 @@ def main():
     emu = subprocess.Popen(command(utils, work, run, port, int(last + 240)), cwd=utils, stdout=open(log, "w"),
                            stderr=subprocess.STDOUT, start_new_session=True)
     gdb = None
+    early = (options["--attach"] or ["face"])[-1] == "boot"
+
+    def attach():
+        deadline = time.monotonic() + 60
+        while True:  # the port opens when QEMU starts
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=5):
+                    break
+            except OSError:
+                if emu.poll() is not None or time.monotonic() > deadline:
+                    sys.exit("no debugger port; see %s" % log)
+                time.sleep(0.5)
+        snap = run / "snap"
+        snap.mkdir(exist_ok=True)
+        env = dict(os.environ, EMU_GDB_PORT=str(port), EMU_OUT=str(snap), EMU_STOPS=";".join(options["--at"]),
+                   EMU_SAVES=";".join(options["--save"]), EMU_FORCES=";".join(options["--force"]),
+                   EMU_MAX_HITS=(options["--max-hits"] or ["2"])[-1])
+        gdb_path = os.environ.get("GDB", str(work / "gdb" / "root" / "usr" / "bin" / "gdb-multiarch"))
+        return subprocess.Popen([gdb_path, "-q", "-batch", "-x", str(HERE / "scripts" / "emu_snap_gdb.py")], env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
     try:
-        ready, deadline = 0, time.monotonic() + 120
+        if early:
+            gdb = attach()
+        ready, deadline = 0, time.monotonic() + 180
         while ready < 4:
             if emu.poll() is not None or time.monotonic() > deadline:
                 sys.exit("emulator did not reach the watch face; see %s" % log)
@@ -79,16 +105,9 @@ def main():
             except OSError:
                 boots = 0
             ready = ready + 1 if boots >= 2 and face_ready(run / "frame.ppm") else 0
-        with socket.create_connection(("127.0.0.1", port), timeout=5):
-            pass
         snap = run / "snap"
-        snap.mkdir(exist_ok=True)
-        env = dict(os.environ, EMU_GDB_PORT=str(port), EMU_OUT=str(snap), EMU_STOPS=";".join(options["--at"]),
-                   EMU_SAVES=";".join(options["--save"]), EMU_FORCES=";".join(options["--force"]),
-                   EMU_MAX_HITS=(options["--max-hits"] or ["2"])[-1])
-        gdb_path = os.environ.get("GDB", str(work / "gdb" / "root" / "usr" / "bin" / "gdb-multiarch"))
-        gdb = subprocess.Popen([gdb_path, "-q", "-batch", "-x", str(HERE / "scripts" / "emu_snap_gdb.py")], env=env,
-                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        if not early:
+            gdb = attach()
         time.sleep(3)  # let gdb attach and set its breakpoints
         start = time.monotonic()
         for at, kind, what in events:

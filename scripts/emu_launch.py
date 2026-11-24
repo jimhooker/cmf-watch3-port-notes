@@ -17,6 +17,8 @@ def command(utils, work, run, port, seconds):
     base = ["uv", "run", "cmf-watch-utils", "emu", "run", "--profile", "wp3-stock",
             "--fixtures", str(work / "fixtures-wp3"), "--qemu", str(work / "runtime" / "qemu-system-arm"),
             "--headless", "--seconds", str(seconds), "--allow-reboot", "--gdb-port", str(port), "--output", str(run)]
+    if os.environ.get("EMU_TRACE_MMIO") == "1":  # device trace in RUN/mmio.log, including every panel transfer
+        base.append("--trace-mmio")
     rom = work / "runtime" / "compat.bin"
     app = os.environ.get("EMU_APP")
     if not app:

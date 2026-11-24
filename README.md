@@ -4,13 +4,16 @@ Analysis of stock Watch 3 Pro firmware `1.0.1.77` (board `jx402_08`) against Wat
 what [`fmctools/cmf-watch-sdk`](https://github.com/fmctools/cmf-watch-sdk) would need to run its stub and loader
 on the Watch 3 Pro. Snapshot of 2026-11-22, read against cmf-watch-sdk `528acf9` and cmf-watch-utils `7997d40`;
 the seven addresses cmf-watch-sdk #22 added for storage inspection (point 9) and the app list in both views
-(point 6) were worked out on 2026-11-23.
+(point 6) were worked out on 2026-11-23; the update path and the first install on a real watch
+([On a real watch](#on-a-real-watch)) on 2026-11-24.
 
-**Nothing here has touched a physical watch.** Every claim is one of:
+**One modified build has run on a physical watch**: the author's, stock `1.0.1.77`. Everything else is static
+analysis or the emulator. Every claim is one of:
 
 - **static**: read from the two public reference images (disassembly, tables, strings);
 - **emulator**: observed in the cmf-watch-utils desktop emulator (`--profile wp3-stock`), Linux x64, runtime
-  `emulator-v0.1.0-preview.10`.
+  `emulator-v0.1.0-preview.10`;
+- **real hardware**: one retail Watch 3 Pro on `1.0.1.77`, from Ubuntu 26.10 (BlueZ 5.87, bleak 3.0.2).
 
 No firmware, vendor resources or device identifiers are in this repository. The scripts download the two public
 reference images that cmf-watch-utils publishes.
@@ -26,6 +29,8 @@ reference images that cmf-watch-utils publishes.
 | Did the property IDs move? | Yes: 0x00-0x23 unchanged, later ones shift (57 inserted, 4 removed) | static, 18 IDs cross-checked at call sites |
 | Is the motor still PWM? | No. A haptic driver chip (AW86225 or SIH6164) behind an effect table | static + emulator |
 | Can an entry be added to the stock app list? | Yes in List; yes in Grid while fewer than 30 stock entries are shown. Done first with stock calls from a debugger, then with a compiled stub (`patches/wp3-applist.patch`) | emulator |
+| Are the app image or the update package signed? | No. The stock `app.bin` is a plain checksummed ACTH image (flags 0, no TLVs); the official package holds CRC32s and nothing else | static |
+| Does a real Watch 3 Pro start an `app.bin` with changed code? | Yes. A stub appended to stock `app.bin` (an app-list entry and a set timer) installed over Bluetooth with the stock update protocol, and the watch restarted into it with its own face and settings | real hardware, one unit |
 
 Cross-check against upstream: cmf-watch-sdk `516990f` (#24) derived Watch 3 Pro addresses independently for the
 watch face guard (`fw/wp2-core/src/wfguard.rs`, `WP3`). The seven functions it shares with this table (`fs_open`,
@@ -97,6 +102,66 @@ The seven addresses #22 added (five fs functions, the FAT driver table, the part
    `/NAND:` mount struct holds the driver table at +0x1C; the partition table passes the loader's checks (ACPT,
    size 744, entry size 24, CRC).
 
+## On a real watch
+
+Unofficial and at your own risk. One way this can end, an image the boot chain refuses to start, has no known
+way back short of opening the watch. It did not happen here, but one unit does not rule it out for other builds.
+
+**What was installed.** `patches/wp3-setlight.patch` (against cmf-watch-sdk `516990f`) extends `fw/wp3-stub`
+with the app-list hook and a stand-up set timer ("Set Light": presets, one buzz to wrap up, three to get off,
+then counting over time). It was built with `scripts/wp3_stub_build.sh SDK STOCK_APP OUT lazy`. `lazy` leaves
+upstream's watch-face guard unpatched, so the only stock bytes that change are the size and checksum fields and
+the two app-list update slots (`0x10215948`, `0x10215A68`). No stub code can run before the app list is opened,
+and in the emulator no stub function is entered during boot. A crash forced at the hook's entry gave one watchdog
+restart and a normal boot to the clock face. The stub is 4,840 bytes, appended at `0x102BD280`.
+
+**The package.** `scripts/wp3_ota_build.py` takes the official 1.0.1.77 package and swaps `app.bin` inside
+`TEMP.bin`, updating only the sizes and CRC32s that cover it. No `<version>` field and no version code changes.
+Given the stock `app.bin` it reproduces the official package byte for byte.
+
+**The transfer.** Pairing with cmf-watch-utils' `tools/cmf_watch.py pair` worked unchanged. The update used its
+`tools/ota_client.py` through `scripts/wp3_ota_client.py`, with `--version 0100014d` (the watch's own version;
+the client's default is a Watch Pro 2 value) and `--pipeline 1`. The watch pulled about 1.95 MB of the 45 MB
+package (`TEMP.bin` and `sdfs_k.bin`) in about 30 s, answered `0xA041 01` and restarted. It came back on its own
+watch face with its settings, and the new entry opened the timer. Buzz timing and a set with the screen off
+behaved as designed. The Nothing X app paired again afterwards.
+
+**Every notification arrives twice.** On the Linux machine used, every notification from the watch came twice, 1-4 ms
+apart: the pairing frames, the AT replies and every `0xA042` data request. The upstream client answers both
+copies. The watch then receives each range twice, logs CRC errors (reproduced in the emulator), asks again about
+1.5 s later and finally rejects the staged copy with `0xA041 00`. Two attempts failed this way, one with the
+default `--pipeline 4` and one with `--pipeline 1`. `scripts/wp3_ota_client.py` drops a notification identical
+to the previous one within 0.2 s; with it 522 of 1,044 notifications were dropped and the transfer went through
+with no repeats. Whether other platforms double the notifications was not checked.
+
+**A rejected update leaves the watch on its update screen.** It shows a QR code and "please connect to the app to
+upgrade again", and stays there across restarts, because the update-in-progress flag (`OTA_UPG_FLAG`) is not
+cleared. Bluetooth, the AT shell and the update service keep working there, and the next good transfer clears it.
+
+**Flicker when drawing over a stock screen.** The display path keeps two full-screen RGB565 buffers
+(`0x3C5E1A34` and `0x3C64BB34`, 0x6A088 bytes each) and keeps re-sending the whole round screen from them in turn.
+The timer is a panel laid over the app list, and with a plain `lv_label_set_text` once a second the seconds
+digit flickered between the old value and the new digit drawn over the old one. Invalidating the whole panel
+every 10 ms for 20 passes after each change (`OBJ_INVALIDATE` `0x101E52A9`) cured it on the watch. A port that
+draws on top of stock screens will probably need the same. The emulator draws only into the first buffer, so it
+cannot show this.
+
+**Rehearsing in the emulator.** cmf-watch-utils' virtual stock update needs a few workarounds for this model:
+- `emu pair-fixture` refuses to save when the guest ran with `--charger-connected`, because the runtime patches
+  two app spots that `restore_wp3_runtime_patches` does not revert (+0x127EAC, +0x12C0C4).
+  `scripts/emu_pair_capture.py` keeps the raw capture so they can be put back.
+- `emu ota` takes only a package whose outer container holds `TEMP.bin` alone: `scripts/wp3_ota_temponly.py`.
+- The update-progress screen writes display-engine register `0x4006C020`, which the machine does not model, so a
+  full-size transfer halts about 6% in. `scripts/emu_exploratory.py` runs `emu` with the machine's exploratory
+  mode, which logs and skips that write.
+- `emu recover --qmp-port` is Watch Pro 2 only: `scripts/emu_capture_ota_reset.py` saves the NOR at the update
+  reboot for `emu recover --nor ... --pending-temp ...`.
+
+With these, the virtual watch took the whole package from the stock client, checked it ("verify pass"), rebooted,
+and the modelled install booted like stock. That covers transfer and stock validation, not the real bootloader.
+`data/boot-recovery.csv` collects this and the recovery study behind it: image header, the public Actions SDK
+bootloader and installer source, safe mode, the crash path, and what other owners report from real hardware.
+
 ## Files
 
 | Path | What |
@@ -119,8 +184,15 @@ The seven addresses #22 added (five fs functions, the FAT driver table, the part
 | `scripts/emu_snap.py` | Saves memory when chosen functions are entered or return, with scripted input and screenshots |
 | `scripts/emu_applist_add.py` | Adds one entry to the stock app list in the emulator, List or Grid, with stock calls only |
 | `patches/wp3-applist.patch` | The app-list hook for `fw/wp3-stub`, as a diff against cmf-watch-sdk `516990f` (MIT, like the code it changes) |
-| `scripts/wp3_stub_build.sh` | Builds the Watch 3 Pro stub and patches it onto a stock app.bin with cargo, objcopy and python3 only |
-| `scripts/emu_launch.py` | How the emu scripts start the emulator; `EMU_APP=app.bin` boots a modified image |
+| `patches/wp3-setlight.patch` | The app-list hook plus the Set Light timer, the `guard=False` option of `patch_wp3` and the redraw fix: the build that ran on a real watch. Same base and licence |
+| `scripts/wp3_stub_build.sh` | Builds the Watch 3 Pro stub and patches it onto a stock app.bin with cargo, objcopy and python3 only; `lazy` leaves the watch-face guard out |
+| `scripts/emu_launch.py` | How the emu scripts start the emulator; `EMU_APP=app.bin` boots a modified image, `EMU_TRACE_MMIO=1` records device accesses |
+| `scripts/emu_snap.py` | `--attach boot` attaches the debugger from the first instruction, to watch the boot path |
+| `data/boot-recovery.csv` | What the watch does when an update or a patched image goes wrong, with sources: static, SDK source, emulator, real hardware |
+| `scripts/wp3_ota_build.py` | Builds an update package from the official one with only `app.bin` swapped, then checks the result against it |
+| `scripts/wp3_ota_client.py` | cmf-watch-utils' stock update client with the repeated-notification filter (`physical` or `emu`) |
+| `scripts/wp3_readonly.py` | Four fixed read-only AT queries over Bluetooth, no pairing; takes no command from the caller |
+| `scripts/wp3_ota_temponly.py`, `scripts/emu_pair_capture.py`, `scripts/emu_capture_ota_reset.py`, `scripts/emu_exploratory.py` | The emulator rehearsal workarounds described above |
 
 `data/functions.csv` (all 8,869 Watch Pro 2 functions and their twins) is not included because its first two
 columns come straight from cmf-watch-utils' `function_map.tsv`; `scripts/run_all.sh` regenerates it, and
@@ -150,10 +222,17 @@ source-file order. The Watch 3 Pro lost its LVGL asserts, so many LVGL functions
 - Property alignment compares which handler sits at which number, not the values a property carries.
 - The 17 addresses of the optional "Weak" vibration tweak were not attempted; the motor it patches is not used here.
 - The emulator models the SIH6164 path. Which haptic chip real units carry, and how effects feel, is untested.
-- Signed boot and recovery on the Watch 3 Pro are open questions this work does not touch.
-- The stub patch was only run in the emulator. Whether the real app partition has room after app.bin is not
-  checked here (upstream's guard-only stub already sits there).
+- Real hardware means one unit and one build. The watch's own second-stage bootloader was never read out, so what
+  it does with an image it refuses, and with power loss during the install, is known only from the public Actions
+  SDK source, which ends in a loop with no Bluetooth.
+- The Watch 3 Pro partition sizes were not measured. The emulator and `check_acth` reuse the Watch Pro 2 app
+  partition (`0x34B000`); the 1.0.1.77 app plus this stub (`0x2BE568` bytes) leave 576,152 bytes of it free.
+- The app-list patch alone (`wp3-applist.patch`) only ran in the emulator; `wp3-setlight.patch` includes it and ran
+  on the watch.
 
 ## Licence
 
-MIT, see `LICENSE`. The scripts read cmf-watch-utils (AGPL-3.0) data as an input and copy none of its code.
+MIT, see `LICENSE`. The scripts read cmf-watch-utils (AGPL-3.0) data as an input or run its tools, and copy none
+of its code. `wp3_ota_client.py`, `emu_pair_capture.py`, `emu_capture_ota_reset.py` and `emu_exploratory.py`
+import cmf-watch-utils modules when they run; that running combination is covered by AGPL-3.0. No firmware,
+update package or patched image is published here: build your own from the official download.

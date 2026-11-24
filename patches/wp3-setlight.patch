@@ -1,0 +1,985 @@
+diff --git a/fw/wp2-core/src/lib.rs b/fw/wp2-core/src/lib.rs
+index b18c9ca..df041a0 100644
+--- a/fw/wp2-core/src/lib.rs
++++ b/fw/wp2-core/src/lib.rs
+@@ -18,6 +18,7 @@ pub mod load;
+ pub mod pkg;
+ pub mod proto;
+ pub mod pwm;
++pub mod setlight;
+ pub mod stock;
+ pub mod storage;
+ pub mod wfguard;
+diff --git a/fw/wp2-core/src/setlight.rs b/fw/wp2-core/src/setlight.rs
+new file mode 100644
+index 0000000..a2aaa45
+--- /dev/null
++++ b/fw/wp2-core/src/setlight.rs
+@@ -0,0 +1,183 @@
++//! Set Light, a stand-up set timer: one buzz says wrap up, a burst of three says get off. The timing and what the
++//! screen shows, kept apart from the stock calls so it runs in host tests (the stub's side is fw/wp3-stub).
++
++/// Set lengths in seconds; the first is a short one for trying the buzzes.
++pub const PRESETS: [u16; 6] = [30, 300, 420, 600, 900, 1200];
++pub const DEFAULT_PRESET: u8 = 1;
++/// The wrap-up buzz comes this long before the end, or halfway through a set that is no longer than this.
++pub const LIGHT: u32 = 60;
++/// A set left running stops by itself this long after the end.
++pub const OVER_LIMIT: u32 = 600;
++/// The get-off burst: this many buzzes, one every `BURST_TICKS` timer ticks.
++pub const BURST: u8 = 3;
++pub const BURST_TICKS: u8 = 3;
++
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub enum Phase {
++    Idle,
++    OnStage,
++    WrapUp,
++    OverTime,
++}
++
++/// Seconds into a set of `set` seconds at which the wrap-up buzz goes out.
++pub fn light_at(set: u32) -> u32 {
++    if set > LIGHT { set - LIGHT } else { set / 2 }
++}
++
++/// The phase and the seconds to show: the set length when idle, the time left while on stage, the time over after.
++pub fn shown(running: bool, elapsed: u32, set: u32) -> (Phase, u32) {
++    match (running, elapsed < set) {
++        (false, _) => (Phase::Idle, set),
++        (true, true) => (if elapsed >= light_at(set) { Phase::WrapUp } else { Phase::OnStage }, set - elapsed),
++        (true, false) => (Phase::OverTime, elapsed - set),
++    }
++}
++
++/// `m:ss` or `mm:ss` as a NUL-terminated string: the text starts at the returned offset of the buffer.
++pub fn clock(seconds: u32) -> ([u8; 6], usize) {
++    let (m, s) = (seconds / 60, seconds % 60);
++    let digit = |n: u32| b'0' + (n % 10) as u8;
++    ([digit(m / 10), digit(m), b':', digit(s / 10), digit(s), 0], (m < 10) as usize)
++}
++
++/// What one timer tick asks for.
++#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
++pub struct Step {
++    /// the single wrap-up buzz
++    pub wrap_up: bool,
++    /// one buzz of the get-off burst
++    pub get_off: bool,
++    /// the set ran `OVER_LIMIT` past its end: stop it
++    pub stop: bool,
++}
++
++/// Which buzzes of a running set went out. `Cues::default()` starts a set.
++#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
++pub struct Cues {
++    lit: bool,
++    ended: bool,
++    burst: u8,
++    wait: u8,
++}
++
++impl Cues {
++    /// Call once per timer tick with the seconds since the set started.
++    pub fn tick(&mut self, elapsed: u32, set: u32) -> Step {
++        let mut step = Step::default();
++        if !self.lit && elapsed >= light_at(set) {
++            (self.lit, step.wrap_up) = (true, true);
++        }
++        if !self.ended && elapsed >= set {
++            (self.ended, self.burst, self.wait) = (true, BURST, 0);
++        }
++        if self.burst > 0 {
++            if self.wait == 0 {
++                step.get_off = true;
++                (self.burst, self.wait) = (self.burst - 1, BURST_TICKS);
++            }
++            self.wait -= 1;
++        }
++        step.stop = elapsed >= set + OVER_LIMIT;
++        step
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn text(seconds: u32) -> String {
++        let (buf, at) = clock(seconds);
++        assert_eq!(buf[5], 0);
++        String::from_utf8(buf[at..5].to_vec()).unwrap()
++    }
++
++    #[test]
++    fn wrap_up_is_a_minute_before_the_end_or_halfway() {
++        assert_eq!(light_at(300), 240);
++        assert_eq!(light_at(1200), 1140);
++        assert_eq!(light_at(30), 15);
++        assert_eq!(light_at(60), 30);
++        assert_eq!(light_at(61), 1);
++    }
++
++    #[test]
++    fn presets_fit_the_clock_and_open_on_five_minutes() {
++        assert_eq!(PRESETS[DEFAULT_PRESET as usize], 300);
++        assert!(PRESETS.windows(2).all(|w| w[0] < w[1]));
++        assert!(PRESETS.iter().all(|&p| (p as u32 + OVER_LIMIT) < 100 * 60));
++    }
++
++    #[test]
++    fn clock_text() {
++        assert_eq!(text(0), "0:00");
++        assert_eq!(text(5), "0:05");
++        assert_eq!(text(30), "0:30");
++        assert_eq!(text(299), "4:59");
++        assert_eq!(text(300), "5:00");
++        assert_eq!(text(600), "10:00");
++        assert_eq!(text(1200), "20:00");
++        assert_eq!(text(1800 - 1), "29:59");
++    }
++
++    #[test]
++    fn screen_follows_the_set() {
++        assert_eq!(shown(false, 123, 300), (Phase::Idle, 300));
++        assert_eq!(shown(true, 0, 300), (Phase::OnStage, 300));
++        assert_eq!(shown(true, 239, 300), (Phase::OnStage, 61));
++        assert_eq!(shown(true, 240, 300), (Phase::WrapUp, 60));
++        assert_eq!(shown(true, 299, 300), (Phase::WrapUp, 1));
++        assert_eq!(shown(true, 300, 300), (Phase::OverTime, 0));
++        assert_eq!(shown(true, 312, 300), (Phase::OverTime, 12));
++        assert_eq!(shown(true, 14, 30), (Phase::OnStage, 16));
++        assert_eq!(shown(true, 15, 30), (Phase::WrapUp, 15));
++    }
++
++    /// Runs a set at four ticks a second and returns the tick numbers of each kind of buzz and of the stop.
++    fn run(set: u32, ticks: u32) -> (Vec<u32>, Vec<u32>, Option<u32>) {
++        let (mut cues, mut wrap, mut off, mut stop) = (Cues::default(), vec![], vec![], None);
++        for t in 0..ticks {
++            let step = cues.tick(t / 4, set);
++            if step.wrap_up {
++                wrap.push(t);
++            }
++            if step.get_off {
++                off.push(t);
++            }
++            if step.stop && stop.is_none() {
++                stop = Some(t);
++            }
++        }
++        (wrap, off, stop)
++    }
++
++    #[test]
++    fn one_buzz_to_wrap_up_then_three_to_get_off() {
++        let (wrap, off, stop) = run(300, 4 * 400);
++        assert_eq!(wrap, [4 * 240]);
++        assert_eq!(off, [4 * 300, 4 * 300 + 3, 4 * 300 + 6]);
++        assert_eq!(stop, None);
++        let (wrap, off, _) = run(30, 4 * 60);
++        assert_eq!(wrap, [4 * 15]);
++        assert_eq!(off, [4 * 30, 4 * 30 + 3, 4 * 30 + 6]);
++    }
++
++    #[test]
++    fn a_forgotten_set_stops_ten_minutes_over() {
++        let (_, off, stop) = run(30, 4 * 700);
++        assert_eq!(off.len(), 3);
++        assert_eq!(stop, Some(4 * (30 + OVER_LIMIT)));
++    }
++
++    #[test]
++    fn a_late_tick_still_gives_every_buzz_once() {
++        // the watch slept through both marks: the first tick after gives the wrap-up buzz and starts the burst
++        let mut cues = Cues::default();
++        assert_eq!(cues.tick(10, 300), Step::default());
++        assert_eq!(cues.tick(320, 300), Step { wrap_up: true, get_off: true, stop: false });
++        let later: Vec<Step> = (0..8).map(|_| cues.tick(321, 300)).collect();
++        assert_eq!(later.iter().filter(|s| s.get_off).count(), 2);
++        assert!(later.iter().all(|s| !s.wrap_up));
++    }
++}
+diff --git a/fw/wp3-stub/Cargo.toml b/fw/wp3-stub/Cargo.toml
+index 0261dde..9155267 100644
+--- a/fw/wp3-stub/Cargo.toml
++++ b/fw/wp3-stub/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "wp3-stub"
+-description = "Stub appended to the Watch 3 Pro stock app.bin: the boot watch face guard only"
++description = "Stub appended to the Watch 3 Pro stock app.bin: the boot watch face guard and the Set Light set timer"
+ edition.workspace = true
+ license.workspace = true
+ version.workspace = true
+diff --git a/fw/wp3-stub/link.ld b/fw/wp3-stub/link.ld
+index ad035ad..1afc18a 100644
+--- a/fw/wp3-stub/link.ld
++++ b/fw/wp3-stub/link.ld
+@@ -1,6 +1,6 @@
+ /* the end of the stock jx402_08 1.0.1.77 app.bin (0x2BD280 bytes) */
+ ENTRY(wp3_wf_boot)
+-MEMORY { FLASH (rx) : ORIGIN = 0x102BD280, LENGTH = 0x1000 }
++MEMORY { FLASH (rx) : ORIGIN = 0x102BD280, LENGTH = 0x2000 }
+ 
+ SECTIONS
+ {
+diff --git a/fw/wp3-stub/src/applist.rs b/fw/wp3-stub/src/applist.rs
+new file mode 100644
+index 0000000..2999f62
+--- /dev/null
++++ b/fw/wp3-stub/src/applist.rs
+@@ -0,0 +1,223 @@
++// "Set Light" entry in the stock app list of the Watch 3 Pro (jx402_08 1.0.1.77), in the List and in the Grid
++// style. A tap opens the set timer (setlight.rs).
++//
++// Both hooks replace a style descriptor's update handler (+0x10). The stock view procedure calls it right after
++// the layout, and the stock update rebuilds the screen through a direct call to the layout when an optional
++// entry appears or goes, so the layout slot alone would lose the entry. No writable statics: the entry is there
++// when the container has one child more than the stock entries shown.
++use crate::stock::*;
++
++// view data (`*(view + 0x14)`): the screen is the first word in both styles
++const FLAGS: usize = 0x290; // bit0 entry 11, bit1 entry 9, bit2 entry 10 are shown
++const LIST_CONT: usize = 0x4;
++const LIST_COUNT: usize = 0x8;
++const LIST_STYLE: usize = 0x264;
++const LIST_LINE_HEIGHT: usize = 0x274;
++const GRID_OBJS: usize = 0x16C;
++const GRID_CONT: usize = 0x1E4;
++const GRID_COUNT: usize = 0x1E8;
++const GRID_LOWEST: usize = 0x1F8;
++
++const ENTRIES: u8 = 30;
++const ALWAYS_SHOWN: u32 = 27;
++const LIST_ICON: usize = 96;
++const GRID_ICON: usize = 160;
++const ALIGN_TOP_LEFT: u32 = 1;
++const OUT_BOTTOM_LEFT: u32 = 0xD;
++const OUT_RIGHT_MID: u32 = 0x14;
++
++// Like the stock icons: LV_IMG_CF_TRUE_COLOR_ALPHA (RGB565 LE + alpha), a filled circle with a light glyph, behind
++// the 64-byte header the stock resource cache puts before its pixels (the emulator's GPU model reads it).
++const HEAD: usize = 64;
++const CIRCLE: u16 = 0x18C3; // the stock icons' circle on this watch
++const LIGHT: u16 = 0xF8E3; // red
++
++type Obj = *mut u8;
++
++#[repr(C)]
++struct ImgDsc {
++    header: u32,
++    size: u32,
++    data: *const u8,
++}
++
++#[repr(C)]
++struct TextRec {
++    text: *const u8,
++    zero: u32,
++}
++
++unsafe impl Sync for TextRec {}
++
++static LABEL: TextRec = TextRec { text: b"Set Light\0".as_ptr(), zero: 0 };
++
++pub extern "C" fn wp3_applist_list(view: *mut u8) {
++    stock!(LIST_UPDATE, fn(*mut u8) -> ())(view);
++    unsafe { add_row(view) };
++}
++
++pub extern "C" fn wp3_applist_grid(view: *mut u8) {
++    stock!(GRID_UPDATE, fn(*mut u8) -> ())(view);
++    unsafe { add_icon(view) };
++}
++
++/// The view data and its container when the stock layout has run and our entry is not there yet, with the
++/// number of stock entries shown.
++unsafe fn stock_state(view: *mut u8, cont: usize, count: usize) -> Option<(*mut u8, Obj, u32)> {
++    let data = unsafe { *(view.add(0x14) as *const *mut u8) };
++    if data.is_null() || unsafe { *(data as *const Obj) }.is_null() {
++        return None;
++    }
++    let cont = unsafe { *(data.add(cont) as *const Obj) };
++    if cont.is_null() || unsafe { *data.add(count) } != ENTRIES {
++        return None;
++    }
++    let shown = ALWAYS_SHOWN + (unsafe { *data.add(FLAGS) } & 7).count_ones();
++    (stock!(OBJ_GET_CHILD_CNT, fn(Obj) -> u32)(cont) == shown).then_some((data, cont, shown))
++}
++
++// A row built like the stock rows (0x10047164), shown first; the stock fisheye (0x10047008) walks every child.
++unsafe fn add_row(view: *mut u8) {
++    let Some((data, cont, shown)) = (unsafe { stock_state(view, LIST_CONT, LIST_COUNT) }) else { return };
++    let Some((block, dsc)) = icon_block(LIST_ICON) else { return };
++    let align_to = stock!(OBJ_ALIGN_TO, fn(Obj, Obj, u32, i32, i32) -> ());
++    let add_flag = stock!(OBJ_ADD_FLAG, fn(Obj, u32) -> ());
++    let set_size = stock!(OBJ_SET_SIZE, fn(Obj, i32, i32) -> ());
++    let add_cb = stock!(OBJ_ADD_EVENT_CB, fn(Obj, extern "C" fn(*mut u8), u32, *mut u8) -> *mut u8);
++    let row = stock!(OBJ_CREATE, fn(Obj) -> Obj)(cont);
++    let img = if row.is_null() { row } else { stock!(IMG_CREATE, fn(Obj) -> Obj)(row) };
++    if img.is_null() {
++        free(block);
++        return;
++    }
++    add_cb(img, freed, DELETE, block);
++    set_size(row, 0x18A, LIST_ICON as i32);
++    add_cb(row, crate::setlight::open, SHORT_CLICKED, core::ptr::null_mut());
++    stock!(OBJ_ALIGN, fn(Obj, u32, i32, i32) -> ())(row, ALIGN_TOP_LEFT, 0x10, 0x50);
++    add_flag(img, FLAG_EVENT_BUBBLE);
++    stock!(IMG_SET_SRC, fn(Obj, *const ImgDsc) -> ())(img, dsc);
++    let lab = stock!(LABEL_CREATE, fn(Obj) -> Obj)(row);
++    if !lab.is_null() {
++        set_size(lab, 0x172 - LIST_ICON as i32, unsafe { *(data.add(LIST_LINE_HEIGHT) as *const i32) });
++        stock!(OBJ_ADD_STYLE, fn(Obj, *mut u8, u32) -> ())(lab, unsafe { data.add(LIST_STYLE) }, 0);
++        stock!(LABEL_SET_LONG_MODE, fn(Obj, u32) -> ())(lab, 3);
++        stock!(LABEL_SET_STRING_DSC, fn(Obj, *const TextRec) -> ())(lab, &LABEL);
++        stock!(LABEL_SCROLL_SETUP, fn(Obj, u32, i32, u32) -> ())(lab, 0, -1, 0);
++        add_flag(lab, FLAG_EVENT_BUBBLE);
++        align_to(lab, img, OUT_RIGHT_MID, 0x18, 0);
++    }
++    let get_child = stock!(OBJ_GET_CHILD, fn(Obj, i32) -> Obj);
++    let mut prev = row;
++    for i in 0..shown as i32 {
++        let r = get_child(cont, i);
++        align_to(r, prev, OUT_BOTTOM_LEFT, 0, 8);
++        prev = r;
++    }
++    stock!(EVENT_SEND, fn(Obj, u32, *mut u8) -> u32)(cont, SCROLL, core::ptr::null_mut());
++}
++
++// One more icon after the stock ones (layout 0x10046B6C): the stock position function takes the count from the
++// container and the objects from a 30-pointer array, so the entry needs a stock entry to be hidden.
++unsafe fn add_icon(view: *mut u8) {
++    let Some((data, cont, shown)) = (unsafe { stock_state(view, GRID_CONT, GRID_COUNT) }) else { return };
++    if shown >= ENTRIES as u32 {
++        return;
++    }
++    let Some((block, dsc)) = icon_block(GRID_ICON) else { return };
++    let add_flag = stock!(OBJ_ADD_FLAG, fn(Obj, u32) -> ());
++    let add_cb = stock!(OBJ_ADD_EVENT_CB, fn(Obj, extern "C" fn(*mut u8), u32, *mut u8) -> *mut u8);
++    let img = stock!(IMG_CREATE, fn(Obj) -> Obj)(cont);
++    if img.is_null() {
++        free(block);
++        return;
++    }
++    unsafe { *(data.add(GRID_OBJS + 4 * shown as usize) as *mut Obj) = img };
++    add_cb(img, freed, DELETE, block);
++    stock!(IMG_SET_SRC, fn(Obj, *const ImgDsc) -> ())(img, dsc);
++    stock!(IMG_SET_PIVOT, fn(Obj, i32, i32) -> ())(img, GRID_ICON as i32 / 2, GRID_ICON as i32 / 2);
++    add_flag(img, FLAG_HIDDEN);
++    add_cb(img, crate::setlight::open, SHORT_CLICKED, core::ptr::null_mut());
++    add_flag(img, FLAG_CLICKABLE);
++    add_flag(img, FLAG_EVENT_BUBBLE);
++    // three icons per row, 160 px apart
++    unsafe { *(data.add(GRID_LOWEST) as *mut i32) = 480 - 160 * ((shown as i32 + 3) / 3) };
++    stock!(GRID_PLACE, fn(*mut u8) -> ())(data);
++}
++
++/// The icon in a RES block: [64 B header][size x size pixels][ImgDsc]. Freed with `free(block)`.
++fn icon_block(size: usize) -> Option<(*mut u8, *const ImgDsc)> {
++    let pixels_len = size * size * 3;
++    let total = HEAD + pixels_len + size_of::<ImgDsc>();
++    let alloc = stock!(UI_MEM_ALIGNED_ALLOC, fn(u32, u32, u32, *const u8) -> *mut u8);
++    let block = alloc(RES, 0x40, total as u32, b"wp3\0".as_ptr());
++    if block.is_null() {
++        return None;
++    }
++    let (pixels, dsc) = unsafe { (block.add(HEAD), block.add(HEAD + pixels_len) as *mut ImgDsc) };
++    unsafe {
++        let head = core::slice::from_raw_parts_mut(block as *mut u32, HEAD / 4);
++        head.fill(0);
++        (head[2], head[4], head[5], head[6], head[8]) = ((HEAD + pixels_len) as u32, size as u32, size as u32, 3, pixels as u32);
++        draw_icon(core::slice::from_raw_parts_mut(pixels, pixels_len), size);
++        dsc.write(ImgDsc { header: 5 | (size as u32) << 10 | (size as u32) << 21, size: pixels_len as u32, data: pixels });
++    }
++    // pixels written through the cached PSRAM mapping must reach PSRAM before the display reads them
++    unsafe { core::arch::asm!("dsb sy", options(nostack)) };
++    stock!(PSRAM_CACHE_FLUSH_INVALIDATE, fn(*mut u8, u32) -> i32)(block, total as u32);
++    unsafe { core::arch::asm!("dsb sy", "isb sy", options(nostack)) };
++    Some((block, dsc))
++}
++
++fn free(block: *mut u8) {
++    stock!(UI_MEM_FREE, fn(u32, *mut u8) -> ())(RES, block);
++}
++
++extern "C" fn freed(e: *mut u8) {
++    free(stock!(EVENT_GET_USER_DATA, fn(*mut u8) -> *mut u8)(e));
++}
++
++// Own artwork: the stock dark circle with a red light in the middle, antialiased; distances in 1/16 px.
++fn draw_icon(out: &mut [u8], size: usize) {
++    let (c, r) = (size as i32 * 8, size as i32 * 4);
++    for y in 0..size {
++        for x in 0..size {
++            let (px, py) = (x as i32 * 16 + 8 - c, y as i32 * 16 + 8 - c);
++            let d = isqrt(px * px + py * py);
++            let colour = mix(CIRCLE, LIGHT, cover(d - r));
++            let i = (y * size + x) * 3;
++            out[i..i + 3].copy_from_slice(&[colour as u8, (colour >> 8) as u8, (cover(d - c) * 255 / 16) as u8]);
++        }
++    }
++}
++
++// 0..=16 of a pixel covered by a shape whose edge is `d` (1/16 px, negative inside) from the pixel centre
++fn cover(d: i32) -> i32 {
++    (8 - d).clamp(0, 16)
++}
++
++fn mix(a: u16, b: u16, t: i32) -> u16 {
++    let ch = |shift: u32, mask: i32| {
++        let (ca, cb) = ((a >> shift) as i32 & mask, (b >> shift) as i32 & mask);
++        (((ca * (16 - t) + cb * t + 8) / 16) as u16) << shift
++    };
++    ch(11, 31) | ch(5, 63) | ch(0, 31)
++}
++
++fn isqrt(n: i32) -> i32 {
++    let mut x = n as u32;
++    let mut r = 0u32;
++    let mut bit = 1u32 << 30;
++    while bit > x {
++        bit >>= 2;
++    }
++    while bit != 0 {
++        if x >= r + bit {
++            x -= r + bit;
++            r = (r >> 1) + bit;
++        } else {
++            r >>= 1;
++        }
++        bit >>= 2;
++    }
++    r as i32
++}
+diff --git a/fw/wp3-stub/src/main.rs b/fw/wp3-stub/src/main.rs
+index 490646e..0446277 100644
+--- a/fw/wp3-stub/src/main.rs
++++ b/fw/wp3-stub/src/main.rs
+@@ -1,7 +1,21 @@
+ #![no_std]
+ #![no_main]
+-// Watch 3 Pro (jx402_08 1.0.1.77): only the watch face guard (wp2-core wfguard.rs). `wp2apps firmware --model wp3`
+-// appends this at 0x102BD280 and points the stock's calls at the header's hooks (src/wp2apps/firmware.py, GUARD_WP3).
++// Watch 3 Pro (jx402_08 1.0.1.77): the watch face guard (wp2-core wfguard.rs) and a "Set Light" entry in the stock
++// app list (applist.rs) that opens a stand-up set timer (setlight.rs). `wp2apps firmware --model wp3` appends this
++// at 0x102BD280 and points the stock's calls and handler slots at the header's hooks (src/wp2apps/firmware.py,
++// GUARD_WP3 and APPLIST_WP3).
++
++/// A stock function at a fixed address, called with the C calling convention.
++macro_rules! stock {
++    ($addr:expr, fn($($t:ty),*) -> $r:ty) => {
++        unsafe { core::mem::transmute::<usize, extern "C" fn($($t),*) -> $r>($addr as usize) }
++    };
++}
++
++mod applist;
++mod setlight;
++mod stock;
++
+ use core::ffi::c_void;
+ use wp2_core::wfguard::{self, Timers, WP3};
+ 
+@@ -14,18 +28,23 @@ pub struct Header {
+     power_down: extern "C" fn(),
+     forced_reboot: extern "C" fn(),
+     wf_parse: extern "C" fn(*mut u8, *mut u8) -> i32,
++    /// version 2: the update handlers of the app list's List and Grid style (applist.rs)
++    applist_list: extern "C" fn(*mut u8),
++    applist_grid: extern "C" fn(*mut u8),
+ }
+ 
+ #[used]
+ #[unsafe(link_section = ".header")]
+ pub static HEADER: Header = Header {
+     magic: *b"WP3S",
+-    version: 1,
++    version: 2,
+     wf_boot: wp3_wf_boot,
+     wf_saved: wp3_wf_saved,
+     power_down: wp3_power_down,
+     forced_reboot: wp3_forced_reboot,
+     wf_parse: wp3_wf_parse,
++    applist_list: applist::wp3_applist_list,
++    applist_grid: applist::wp3_applist_grid,
+ };
+ 
+ #[unsafe(no_mangle)]
+diff --git a/fw/wp3-stub/src/setlight.rs b/fw/wp3-stub/src/setlight.rs
+new file mode 100644
+index 0000000..9e5f726
+--- /dev/null
++++ b/fw/wp3-stub/src/setlight.rs
+@@ -0,0 +1,288 @@
++// Set Light: a stand-up set timer built into the stub. One buzz says wrap up, a burst of three says get off.
++//
++// The screen is a panel over the app list (a child of the list's screen, so it goes when the list is left); the
++// set itself keeps running in an LVGL timer. There are no writable statics: the state lives in a heap block that
++// the timer carries as its user data, and the app-list entry finds it again by walking LVGL's timer list.
++// LVGL timers stop in deep sleep, so a running set holds a wake lock. The timing itself is wp2-core setlight.rs.
++use crate::stock::*;
++use core::ptr::null_mut;
++use wp2_core::setlight::{clock, shown, Cues, Phase, DEFAULT_PRESET, PRESETS};
++
++const TICK_MS: u32 = 250; // the get-off buzzes are BURST_TICKS of these apart: 750 ms, 400 ms each
++// The display shows two frame buffers in turn, and a change drawn into only one of them flickers against the other
++// (seen on a real watch: the old seconds alternating with the new digit drawn over them). So after each change the
++// whole panel is invalidated again every REDRAW_MS for REDRAWS passes, which covers several consecutive refreshes
++// and so both buffers.
++const REDRAW_MS: u32 = 10;
++const REDRAWS: u8 = 20;
++const STRENGTH: u32 = 0x7F;
++const BUZZ_400: u32 = 1;
++const BUZZ_700: u32 = 2;
++/// No stock code takes this lock id: the view ids end at 0x117 and the fixed ones are 0x119, 0x136 and above.
++const LOCK_ID: u32 = 0x130;
++
++const BLACK: u32 = 0x0000;
++const WHITE: u32 = 0xFFFF;
++const GREY: u32 = 0x18C3;
++const PRESSED: u32 = 0x39E7;
++const AMBER: u32 = 0xFD20;
++const RED: u32 = 0xF8E3;
++const BUTTON: i32 = 84;
++
++type Obj = *mut u8;
++type Cb = extern "C" fn(*mut u8);
++
++#[repr(C)]
++struct State {
++    timer: *mut u8,
++    panel: Obj,
++    phase: Obj,
++    time: Obj,
++    minus: Obj,
++    plus: Obj,
++    go: Obj,    // the text on the start/stop button
++    start: u32, // UTC seconds
++    drawn: u32, // what the screen shows: phase << 16 | seconds
++    cues: Cues, // which buzzes of the running set went out
++    preset: u8,
++    running: bool,
++    small_open: bool,
++    big_open: bool,
++    redraws: u8,       // passes of `again` still to come
++    burst: *mut u8,    // the `again` timer while one runs
++    small: [u32; 8], // lv_font_t
++    big: [u32; 8],
++}
++
++/// The app-list entry was tapped.
++pub extern "C" fn open(_e: *mut u8) {
++    let s = find();
++    let s = if s.is_null() { create() } else { s };
++    if let Some(s) = unsafe { s.as_mut() }
++        && s.panel.is_null()
++    {
++        build(s);
++        draw(s);
++    }
++}
++
++fn find() -> *mut State {
++    let mut node = unsafe { *((TIMER_LIST + 4) as *const *const u32) };
++    while !node.is_null() {
++        if unsafe { *node.add(2) } == tick as *const () as usize as u32 {
++            return unsafe { *node.add(3) } as *mut State;
++        }
++        node = unsafe { *node.add(7) } as *const u32;
++    }
++    null_mut()
++}
++
++fn create() -> *mut State {
++    let alloc = stock!(UI_MEM_ALIGNED_ALLOC, fn(u32, u32, u32, *const u8) -> *mut u8);
++    let s = alloc(RES, 0x40, size_of::<State>() as u32, b"setlight\0".as_ptr()) as *mut State;
++    if s.is_null() {
++        return s;
++    }
++    let timer = stock!(TIMER_CREATE, fn(Cb, u32, *mut State) -> *mut u8)(tick, TICK_MS, s);
++    unsafe {
++        s.write_bytes(0, 1);
++        (*s).preset = DEFAULT_PRESET;
++        (*s).timer = timer;
++    }
++    s
++}
++
++extern "C" fn tick(timer: *mut u8) {
++    let s = unsafe { &mut **(timer.add(0xC) as *mut *mut State) };
++    if s.running {
++        let step = s.cues.tick(now().wrapping_sub(s.start), PRESETS[s.preset as usize] as u32);
++        if step.wrap_up {
++            buzz(BUZZ_700);
++        }
++        if step.get_off {
++            buzz(BUZZ_400);
++        }
++        if step.stop {
++            stop(s);
++        }
++    }
++    if !s.panel.is_null() {
++        draw(s);
++    } else if !s.running {
++        // nothing to show and nothing to time: the state goes with its timers
++        if !s.burst.is_null() {
++            stock!(TIMER_DEL, fn(*mut u8) -> ())(s.burst);
++        }
++        stock!(TIMER_DEL, fn(*mut u8) -> ())(s.timer);
++        stock!(UI_MEM_FREE, fn(u32, *mut State) -> ())(RES, s);
++    }
++}
++
++fn now() -> u32 {
++    stock!(UTC_SECONDS, fn() -> u32)()
++}
++
++fn buzz(effect: u32) {
++    stock!(VIBRATE, fn(u32, u32) -> i32)(STRENGTH, effect);
++}
++
++fn start(s: &mut State) {
++    (s.start, s.running, s.cues) = (now(), true, Cues::default());
++    stock!(WAKE_LOCK, fn(u32) -> ())(LOCK_ID);
++}
++
++fn stop(s: &mut State) {
++    s.running = false;
++    stock!(WAKE_UNLOCK, fn(u32) -> ())(LOCK_ID);
++}
++
++fn style(obj: Obj, prop: u32, value: u32, selector: u32) {
++    stock!(OBJ_SET_LOCAL_STYLE_PROP, fn(Obj, u32, u32, u32) -> ())(obj, prop, value, selector)
++}
++
++fn place(obj: Obj, x: i32, y: i32, w: i32, h: i32) -> Obj {
++    stock!(OBJ_SET_POS, fn(Obj, i32, i32) -> ())(obj, x, y);
++    stock!(OBJ_SET_SIZE, fn(Obj, i32, i32) -> ())(obj, w, h);
++    obj
++}
++
++fn panel(parent: Obj, x: i32, y: i32, w: i32, h: i32, colour: u32) -> Obj {
++    let o = place(stock!(OBJ_CREATE, fn(Obj) -> Obj)(parent), x, y, w, h);
++    style(o, STYLE_BG_COLOR, colour, 0);
++    style(o, STYLE_BG_OPA, 0xFF, 0);
++    o
++}
++
++/// A centred line of text, `w` wide.
++fn label(parent: Obj, y: i32, w: i32, h: i32) -> Obj {
++    let l = place(stock!(LABEL_CREATE, fn(Obj) -> Obj)(parent), 0, y, w, h);
++    style(l, STYLE_TEXT_ALIGN, TEXT_ALIGN_CENTER, 0);
++    l
++}
++
++fn set_text(label: Obj, text: &[u8]) {
++    stock!(LABEL_SET_TEXT, fn(Obj, *const u8) -> ())(label, text.as_ptr());
++}
++
++/// A round-ended button with one line of text; returns the button and its label.
++fn button(s: &mut State, x: i32, w: i32, line: i32, cb: Cb) -> (Obj, Obj) {
++    let b = panel(s.panel, x, 300, w, BUTTON, GREY);
++    style(b, STYLE_RADIUS, BUTTON as u32 / 2, 0);
++    style(b, STYLE_BG_COLOR, PRESSED, STATE_PRESSED);
++    stock!(OBJ_ADD_EVENT_CB, fn(Obj, Cb, u32, *mut State) -> *mut u8)(b, cb, SHORT_CLICKED, s);
++    (b, label(b, (BUTTON - line) / 2, w, line))
++}
++
++fn open_font(font: &mut [u32; 8], path: u32) -> bool {
++    stock!(FONT_OPEN, fn(*mut u32, u32) -> i32)(font.as_mut_ptr(), path) == 0
++}
++
++fn build(s: &mut State) {
++    let scr = stock!(SCR_ACT, fn(Obj) -> Obj)(null_mut());
++    s.panel = panel(scr, 0, 0, 466, 466, BLACK);
++    stock!(OBJ_ADD_EVENT_CB, fn(Obj, Cb, u32, *mut State) -> *mut u8)(s.panel, closed, DELETE, s);
++    s.small_open = open_font(&mut s.small, FONT_36M);
++    s.big_open = open_font(&mut s.big, FONT_NM120);
++    let small = if s.small_open { s.small.as_ptr() as u32 } else { LV_FONT_DEFAULT };
++    let big = if s.big_open { s.big.as_ptr() as u32 } else { small };
++    // an lv_font_t has its line height in the third word
++    let line = |font: u32| unsafe { *(font as *const i32).add(2) }.clamp(1, 200);
++    style(s.panel, STYLE_TEXT_FONT, small, 0);
++    style(s.panel, STYLE_TEXT_COLOR, WHITE, 0);
++    s.phase = label(s.panel, 64, 466, line(small));
++    s.time = label(s.panel, 210 - line(big) / 2, 466, line(big));
++    style(s.time, STYLE_TEXT_FONT, big, 0);
++    let (minus, text) = button(s, 58, BUTTON, line(small), shorter);
++    set_text(text, b"-\0");
++    s.minus = minus;
++    (_, s.go) = button(s, 163, 140, line(small), toggle);
++    let (plus, text) = button(s, 324, BUTTON, line(small), longer);
++    set_text(text, b"+\0");
++    s.plus = plus;
++    s.drawn = !0;
++}
++
++/// Brings the screen in line with the state; cheap when nothing changed.
++fn draw(s: &mut State) {
++    let (phase, seconds) = shown(s.running, now().wrapping_sub(s.start), PRESETS[s.preset as usize] as u32);
++    let was = s.drawn;
++    s.drawn = (phase as u32) << 16 | seconds;
++    if s.drawn == was {
++        return;
++    }
++    let (text, at) = clock(seconds);
++    set_text(s.time, &text[at..]);
++    redraw(s);
++    if was >> 16 == phase as u32 {
++        return;
++    }
++    let (name, colour): (&[u8], u32) = match phase {
++        Phase::Idle => (b"Set Light\0", WHITE),
++        Phase::OnStage => (b"ON STAGE\0", WHITE),
++        Phase::WrapUp => (b"WRAP UP\0", AMBER),
++        Phase::OverTime => (b"OVER TIME\0", RED),
++    };
++    set_text(s.phase, name);
++    style(s.phase, STYLE_TEXT_COLOR, colour, 0);
++    style(s.time, STYLE_TEXT_COLOR, colour, 0);
++    let idle = phase == Phase::Idle;
++    set_text(s.go, if idle { b"Start\0" } else { b"Stop\0" });
++    let show = if idle { OBJ_CLEAR_FLAG } else { OBJ_ADD_FLAG };
++    for o in [s.minus, s.plus] {
++        stock!(show, fn(Obj, u32) -> ())(o, FLAG_HIDDEN);
++    }
++}
++
++/// Starts (or extends) the burst of whole-panel redraws that follows a change.
++fn redraw(s: &mut State) {
++    s.redraws = REDRAWS;
++    if s.burst.is_null() {
++        s.burst = stock!(TIMER_CREATE, fn(Cb, u32, *mut State) -> *mut u8)(again, REDRAW_MS, s);
++    }
++}
++
++extern "C" fn again(timer: *mut u8) {
++    let s = unsafe { &mut **(timer.add(0xC) as *mut *mut State) };
++    if !s.panel.is_null() {
++        stock!(OBJ_INVALIDATE, fn(Obj) -> ())(s.panel);
++    }
++    s.redraws = s.redraws.saturating_sub(1);
++    if s.redraws == 0 || s.panel.is_null() {
++        stock!(TIMER_DEL, fn(*mut u8) -> ())(timer);
++        s.burst = null_mut();
++    }
++}
++
++fn state(e: *mut u8) -> &'static mut State {
++    let s = stock!(EVENT_GET_USER_DATA, fn(*mut u8) -> *mut State)(e);
++    unsafe { &mut *s }
++}
++
++extern "C" fn toggle(e: *mut u8) {
++    let s = state(e);
++    if s.running { stop(s) } else { start(s) }
++    draw(s);
++}
++
++extern "C" fn shorter(e: *mut u8) {
++    let s = state(e);
++    s.preset = s.preset.saturating_sub(1);
++    draw(s);
++}
++
++extern "C" fn longer(e: *mut u8) {
++    let s = state(e);
++    s.preset = (s.preset + 1).min(PRESETS.len() as u8 - 1);
++    draw(s);
++}
++
++// The panel went with its screen: the next tick frees the state unless a set is running.
++extern "C" fn closed(e: *mut u8) {
++    let s = state(e);
++    s.panel = null_mut();
++    for (open, font) in [(&mut s.small_open, &mut s.small), (&mut s.big_open, &mut s.big)] {
++        if core::mem::take(open) {
++            stock!(FONT_CLOSE, fn(*mut u32) -> ())(font.as_mut_ptr());
++        }
++    }
++}
+diff --git a/fw/wp3-stub/src/stock.rs b/fw/wp3-stub/src/stock.rs
+new file mode 100644
+index 0000000..47b22b3
+--- /dev/null
++++ b/fw/wp3-stub/src/stock.rs
+@@ -0,0 +1,63 @@
++// Stock addresses of the Watch 3 Pro (jx402_08 1.0.1.77) that the app-list entry and the set timer call.
++// Thumb functions unless noted. Each was seen working in the emulator; none was run on a watch.
++pub const UI_MEM_ALIGNED_ALLOC: u32 = 0x1019C389; // (pool, align, size, name)
++pub const UI_MEM_FREE: u32 = 0x1019C445; // (pool, ptr)
++pub const PSRAM_CACHE_FLUSH_INVALIDATE: u32 = 0x101DC72F;
++pub const VIBRATE: u32 = 0x100DA77D; // (strength, effect): 0 = 200 ms, 1 = 400 ms, 2 = 700 ms
++pub const UTC_SECONDS: u32 = 0x100B3CCD;
++pub const WAKE_LOCK: u32 = 0x101D0DE1; // (id)
++pub const WAKE_UNLOCK: u32 = 0x100B4C45;
++pub const FONT_OPEN: u32 = 0x100D9151; // (lv_font_t *, path) -> 0
++pub const FONT_CLOSE: u32 = 0x101997F5;
++pub const FONT_36M: u32 = 0x10238A24; // "/NAND:A/font36M.font", data
++pub const FONT_NM120: u32 = 0x1023BEAB; // "/NAND:A/nm120NB.font", data
++pub const LV_FONT_DEFAULT: u32 = 0x102304B8; // data
++pub const TIMER_LIST: u32 = 0x38044C54; // RAM: LVGL's timer list {node size 0x18, head, tail}; next at node + 0x1C
++
++pub const SCR_ACT: u32 = 0x101366DD;
++pub const OBJ_CREATE: u32 = 0x10138B49;
++pub const OBJ_GET_CHILD: u32 = 0x101E66BB;
++pub const OBJ_GET_CHILD_CNT: u32 = 0x101E66D9;
++pub const OBJ_SET_POS: u32 = 0x101E4DB1;
++pub const OBJ_SET_SIZE: u32 = 0x101E4E23;
++pub const OBJ_ALIGN: u32 = 0x101E4E85;
++pub const OBJ_ALIGN_TO: u32 = 0x10139C45;
++pub const OBJ_INVALIDATE: u32 = 0x101E52A9; // (obj)
++pub const OBJ_ADD_FLAG: u32 = 0x101E4367;
++pub const OBJ_CLEAR_FLAG: u32 = 0x101E428D;
++pub const OBJ_ADD_EVENT_CB: u32 = 0x10136AA1;
++pub const OBJ_ADD_STYLE: u32 = 0x1013AA71;
++pub const OBJ_SET_LOCAL_STYLE_PROP: u32 = 0x101E609D; // (obj, prop, value, selector)
++pub const EVENT_SEND: u32 = 0x10136A3D;
++pub const EVENT_GET_USER_DATA: u32 = 0x101E37D3;
++pub const IMG_CREATE: u32 = 0x10041959;
++pub const IMG_SET_SRC: u32 = 0x101C675D;
++pub const IMG_SET_PIVOT: u32 = 0x101C67A7;
++pub const LABEL_CREATE: u32 = 0x1014BB49;
++pub const LABEL_SET_TEXT: u32 = 0x1014C3D1;
++pub const LABEL_SET_LONG_MODE: u32 = 0x1014C611;
++pub const LABEL_SET_STRING_DSC: u32 = 0x1014C5D1;
++pub const LABEL_SCROLL_SETUP: u32 = 0x101ECE0B;
++pub const TIMER_CREATE: u32 = 0x10148E6D; // (cb, period ms, user data)
++pub const TIMER_DEL: u32 = 0x10148F05;
++
++// the app list (applist.rs)
++pub const LIST_UPDATE: u32 = 0x10047351;
++pub const GRID_UPDATE: u32 = 0x10046D99;
++pub const GRID_PLACE: u32 = 0x101C70EB;
++
++pub const RES: u32 = 2; // the UI memory pool the stock icons come from
++pub const SHORT_CLICKED: u32 = 4;
++pub const SCROLL: u32 = 11;
++pub const DELETE: u32 = 33;
++pub const FLAG_HIDDEN: u32 = 1;
++pub const FLAG_CLICKABLE: u32 = 2;
++pub const FLAG_EVENT_BUBBLE: u32 = 0x4000;
++pub const STATE_PRESSED: u32 = 0x20;
++pub const STYLE_RADIUS: u32 = 0x0B;
++pub const STYLE_BG_COLOR: u32 = 0x20;
++pub const STYLE_BG_OPA: u32 = 0x21;
++pub const STYLE_TEXT_COLOR: u32 = 0x55;
++pub const STYLE_TEXT_FONT: u32 = 0x57;
++pub const STYLE_TEXT_ALIGN: u32 = 0x5B;
++pub const TEXT_ALIGN_CENTER: u32 = 2;
+diff --git a/src/wp2apps/firmware.py b/src/wp2apps/firmware.py
+index daa3f22..6bf3d8f 100644
+--- a/src/wp2apps/firmware.py
++++ b/src/wp2apps/firmware.py
+@@ -48,8 +48,12 @@ STOCK_BLE_READ = 0x100CC284
+ # Watch 3 Pro jx402_08 1.0.1.77 (wp2-core wfguard.rs WP3): the stub goes at the end of app.bin
+ WP3_STOCK_SHA256_PREFIX = "815a21fc80aa3941"
+ WP3_STUB_OFFSET = 0x2BD280
+-WP3_STUB_MAX = 0x1000
++WP3_STUB_MAX = 0x2000
+ WP3_STUB_HEADER = struct.Struct("<4sI5I")
++# header version 2 adds the app list's update handlers (fw/wp3-stub/src/applist.rs)
++WP3_STUB_HEADER_V2 = struct.Struct("<4sI7I")
++# (rodata slot, its stock handler): +0x10 of the List and of the Grid style descriptor, in the header's order
++APPLIST_WP3 = ((0x10215A68, 0x10047351), (0x10215948, 0x10046D99))
+ GUARD_WP3 = (
+     (0x100D6E20, 0x101D5A02, WF_BOOT),
+     (0x100A5D84, 0x100D577C, WF_SAVED),
+@@ -301,21 +305,27 @@ def put_guard(out: bytearray, sites: tuple, hooks: list[int]) -> None:
+         put(out, at, thumb_bl(at, stock), thumb_bl(at, hooks[hook] & ~1))
+ 
+ 
+-def patch_wp3(app: bytes, stub: bytes) -> bytes:
+-    """Watch 3 Pro: appends fw/wp3-stub (the watch face guard only) and points the GUARD_WP3 calls at it."""
++def patch_wp3(app: bytes, stub: bytes, *, guard: bool = True) -> bytes:
++    """Watch 3 Pro: appends fw/wp3-stub and points the GUARD_WP3 calls and, from header version 2, the APPLIST_WP3
++    slots at it. With `guard=False` the GUARD_WP3 calls stay stock: no stub code runs until the app list is laid
++    out, so the boot path is the stock one."""
+     if not hashlib.sha256(app).hexdigest().startswith(WP3_STOCK_SHA256_PREFIX):
+         raise ValueError("not the stock jx402_08 1.0.1.77 app.bin (sha256 mismatch)")
+     out = bytearray(app)
+-    add_stub_wp3(out, stub)
++    add_stub_wp3(out, stub, guard=guard)
+     fix_acth(out)
+     check_acth(out)
+     return bytes(out)
+ 
+ 
+-def add_stub_wp3(out: bytearray, stub: bytes) -> None:
+-    magic, version, *guard = WP3_STUB_HEADER.unpack_from(stub)
++def add_stub_wp3(out: bytearray, stub: bytes, *, guard: bool = True) -> None:
++    magic, version = struct.unpack_from("<4sI", stub)
++    if magic != b"WP3S" or version not in (1, 2):
++        raise ValueError("bad stub header")
++    hooks = (WP3_STUB_HEADER if version == 1 else WP3_STUB_HEADER_V2).unpack_from(stub)[2:]
++    guard_hooks, applist = hooks[:5], hooks[5:]
+     base = APP_VBASE + WP3_STUB_OFFSET
+-    if magic != b"WP3S" or version != 1 or not all(p & 1 and base <= p & ~1 < base + len(stub) for p in guard):
++    if not all(p & 1 and base <= p & ~1 < base + len(stub) for p in hooks):
+         raise ValueError("bad stub header")
+     if len(stub) > WP3_STUB_MAX:
+         raise ValueError(f"stub takes {len(stub):#x} bytes; the limit is {WP3_STUB_MAX:#x}")
+@@ -323,7 +333,10 @@ def add_stub_wp3(out: bytearray, stub: bytes) -> None:
+         raise ValueError(f"app.bin is {len(out):#x} bytes; the stub goes at {WP3_STUB_OFFSET:#x}")
+     out += stub
+     out += bytes(-len(out) % 4)
+-    put_guard(out, GUARD_WP3, guard)
++    if guard:
++        put_guard(out, GUARD_WP3, guard_hooks)
++    for (slot, stock), hook in zip(APPLIST_WP3, applist):
++        put(out, slot, struct.pack("<I", stock), struct.pack("<I", hook))
+ 
+ 
+ def changed_ranges(old: bytes, new: bytes, gap: int = 16) -> list[tuple[int, int]]:
+diff --git a/tests/test_firmware.py b/tests/test_firmware.py
+index 597e7e4..8c4b116 100644
+--- a/tests/test_firmware.py
++++ b/tests/test_firmware.py
+@@ -334,6 +334,46 @@ class FirmwareTest(unittest.TestCase):
+             with self.assertRaisesRegex(ValueError, "stub"):
+                 firmware.add_stub_wp3(bytearray(app), bad)
+ 
++    def test_wp3_applist_slots_patched(self):
++        hooks = [0x102BD29D, 0x102BD2A1, 0x102BD2A9, 0x102BD2B1, 0x102BD2B9, 0x102BD2C1, 0x102BD2C9]
++        app = bytearray(firmware.WP3_STUB_OFFSET)
++        for at, stock, _ in firmware.GUARD_WP3:
++            app[at - 0x10000000:at - 0x10000000 + 4] = firmware.thumb_bl(at, stock)
++        for slot, stock in firmware.APPLIST_WP3:
++            struct.pack_into("<I", app, slot - 0x10000000, stock)
++        out = bytearray(app)
++        firmware.add_stub_wp3(out, b"WP3S" + struct.pack("<8I", 2, *hooks) + bytes(0x40))
++        for (slot, _), hook in zip(firmware.APPLIST_WP3, hooks[5:]):
++            self.assertEqual(struct.unpack_from("<I", out, slot - 0x10000000)[0], hook, hex(slot))
++        # a version 1 stub leaves the slots alone
++        out = bytearray(app)
++        firmware.add_stub_wp3(out, wp3_stub(hooks[:5]))
++        for slot, stock in firmware.APPLIST_WP3:
++            self.assertEqual(struct.unpack_from("<I", out, slot - 0x10000000)[0], stock, hex(slot))
++        stale = bytearray(app)
++        struct.pack_into("<I", stale, firmware.APPLIST_WP3[0][0] - 0x10000000, 0)
++        for bad, error in ((b"WP3S" + struct.pack("<8I", 3, *hooks) + bytes(0x40), "stub"),
++                           (b"WP3S" + struct.pack("<8I", 2, *hooks[:6], 0x102BD2C8) + bytes(0x40), "stub")):
++            with self.assertRaisesRegex(ValueError, error):
++                firmware.add_stub_wp3(bytearray(app), bad)
++        with self.assertRaisesRegex(ValueError, "unexpected bytes"):
++            firmware.add_stub_wp3(stale, b"WP3S" + struct.pack("<8I", 2, *hooks) + bytes(0x40))
++
++    def test_wp3_without_guard_changes_only_the_slots(self):
++        hooks = [0x102BD29D, 0x102BD2A1, 0x102BD2A9, 0x102BD2B1, 0x102BD2B9, 0x102BD2C1, 0x102BD2C9]
++        app = bytearray(firmware.WP3_STUB_OFFSET)
++        for at, stock, _ in firmware.GUARD_WP3:
++            app[at - 0x10000000:at - 0x10000000 + 4] = firmware.thumb_bl(at, stock)
++        for slot, stock in firmware.APPLIST_WP3:
++            struct.pack_into("<I", app, slot - 0x10000000, stock)
++        out = bytearray(app)
++        firmware.add_stub_wp3(out, b"WP3S" + struct.pack("<8I", 2, *hooks) + bytes(0x40), guard=False)
++        slots = {slot - 0x10000000 + i for slot, _ in firmware.APPLIST_WP3 for i in range(4)}
++        # nothing on the boot path changes: the stub runs only when the app list is laid out
++        self.assertLessEqual({i for i in range(len(app)) if out[i] != app[i]}, slots)
++        for (slot, _), hook in zip(firmware.APPLIST_WP3, hooks[5:]):
++            self.assertEqual(struct.unpack_from("<I", out, slot - 0x10000000)[0], hook, hex(slot))
++
+     @skipUnless(STOCK_WP3 is not None, "needs JX402_w3pro_V1.0.1.77.bin")
+     def test_wp3_stock_patch(self):
+         self.assertEqual(len(STOCK_WP3), firmware.WP3_STUB_OFFSET)
